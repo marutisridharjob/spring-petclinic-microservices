@@ -413,8 +413,10 @@ pipeline {
     
     post {
         always {
-            // Clean workspace after build
-            deleteDir()
+            script {
+                // Clean workspace after build
+                deleteDir()
+            }
         }
         success {
             echo 'Pipeline completed successfully!'
