@@ -7,7 +7,7 @@ pipeline {
     
     environment {
         MINIMUM_COVERAGE = '70'
-        GITHUB_APP_CREDENTIAL = credentials('github-app-checks')
+        GITHUB_APP_CREDENTIAL = credentials('cfb6bc03-a8c4-4842-a1a6-7256395a492f')
     }
     
     options {
@@ -412,6 +412,10 @@ pipeline {
     }
     
     post {
+        always {
+            echo 'Cleaning up...'
+            cleanWs()
+        }
         success {
             echo 'Pipeline completed successfully!'
         }
