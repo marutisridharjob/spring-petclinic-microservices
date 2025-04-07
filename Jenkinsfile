@@ -65,15 +65,20 @@ pipeline {
                         
                         SERVICES.each { service, path ->
                             def changes = sh(
-                                script: "git diff origin/${env.CHANGE_TARGET}...HEAD --name-only | grep ^${path}/ || true",
+                                script: "git diff origin/${env.CHANGE_TARGET}...HEAD --name-only | grep -E '^${path}/' || true",
                                 returnStdout: true
                             ).trim()
                             
                             if (changes) {
                                 echo "Changes detected in ${service}"
                                 env.CHANGED_SERVICES = env.CHANGED_SERVICES + " " + service
+                            } else {
+                                echo "No changes detected in ${service}"
                             }
                         }
+                        
+                        // Debug output to verify what was detected
+                        echo "Detected changes in these services: ${env.CHANGED_SERVICES}"
                     } 
                     // For direct branch builds, compare with previous commit
                     else {
@@ -91,10 +96,61 @@ pipeline {
                         }
                     }
                     
-                    // If no specific service changes detected, build all
+                    // If no specific service changes detected, print warning and only include files from PR
                     if (env.CHANGED_SERVICES.trim().isEmpty()) {
-                        echo "No specific service changes detected, will process all services"
-                        env.CHANGED_SERVICES = SERVICES.keySet().join(" ")
+                        echo "WARNING: No service changes detected using path-based approach"
+                        
+                        // Get all changed files in PR to check directly
+                        def allChangedFiles = sh(
+                            script: "git diff origin/${env.CHANGE_TARGET}...HEAD --name-only || true",
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "All changed files in PR: ${allChangedFiles}"
+                        
+                        // Directly check each service by looking at file paths
+                        SERVICES.each { service, path ->
+                            def serviceMatch = sh(
+                                script: "echo '${allChangedFiles}' | grep -E '^${path}/' || true",
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (serviceMatch) {
+                                echo "Manual check: Changes detected in ${service}"
+                                env.CHANGED_SERVICES = env.CHANGED_SERVICES + " " + service
+                            }
+                        }
+                        
+                        // If still empty, then only build the services explicitly mentioned in commit messages
+                        if (env.CHANGED_SERVICES.trim().isEmpty()) {
+                            echo "Still no changes detected, will check commit messages"
+                            
+                            def commitMessages = sh(
+                                script: "git log origin/${env.CHANGE_TARGET}...HEAD --pretty=format:%s || true",
+                                returnStdout: true
+                            ).trim()
+                            
+                            echo "Commit messages: ${commitMessages}"
+                            
+                            SERVICES.each { service, path ->
+                                // Check if service name is mentioned in commit messages
+                                if (commitMessages.toLowerCase().contains(service.toLowerCase())) {
+                                    echo "Service ${service} mentioned in commit messages"
+                                    env.CHANGED_SERVICES = env.CHANGED_SERVICES + " " + service
+                                }
+                            }
+                            
+                            // If still empty after all checks, fallback to only modified files from PR
+                            if (env.CHANGED_SERVICES.trim().isEmpty()) {
+                                echo "After all checks, no specific services identified"
+                                echo "Only building services with files modified in the PR"
+                                
+                                // Check Jenkinsfile change
+                                if (allChangedFiles.contains("Jenkinsfile")) {
+                                    echo "Jenkinsfile was modified, but no services will be built unless explicitly changed"
+                                }
+                            }
+                        }
                     }
                     
                     echo "Services to process: ${env.CHANGED_SERVICES}"
