@@ -414,10 +414,7 @@ pipeline {
     post {
         always {
             // Clean workspace after build
-            cleanWs(cleanWhenNotBuilt: false,
-                    deleteDirs: true,
-                    disableDeferredWipeout: true,
-                    notFailBuild: true)
+            deleteDir()
         }
         success {
             echo 'Pipeline completed successfully!'
