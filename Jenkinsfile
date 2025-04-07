@@ -7,7 +7,7 @@ pipeline {
     
     environment {
         MINIMUM_COVERAGE = '70'
-        GITHUB_APP_CREDENTIAL = credentials('github-app-checks')
+        GITHUB_APP_CREDENTIAL = credentials('cfb6bc03-a8c4-4842-a1a6-7256395a492f')
     }
     
     options {
@@ -53,18 +53,13 @@ pipeline {
                         // Set initial GitHub check for PR
                         if (env.CHANGE_ID) {
                             try {
-                                githubChecks(
-                                    name: "CI Pipeline",
-                                    status: 'IN_PROGRESS',
-                                    detailsURL: env.BUILD_URL,
-                                    output: [
-                                        title: 'CI Pipeline Running',
-                                        summary: 'Analyzing changed services and running tests...',
-                                        text: 'This check will update when the pipeline completes.'
-                                    ]
+                                setGitHubPullRequestStatus(
+                                    context: "CI Pipeline",
+                                    state: 'PENDING',
+                                    message: "CI Pipeline Running: Analyzing changed services and running tests..."
                                 )
                             } catch (Exception e) {
-                                echo "Warning: Failed to create GitHub check: ${e.message}"
+                                echo "Warning: Failed to set GitHub PR status: ${e.message}"
                             }
                         }
                         
@@ -129,18 +124,13 @@ pipeline {
                                 // Set service check to pending if this is a PR
                                 if (env.CHANGE_ID) {
                                     try {
-                                        githubChecks(
-                                            name: "Test Code Coverage - ${service}",
-                                            status: 'IN_PROGRESS',
-                                            detailsURL: "${env.BUILD_URL}/jacoco/",
-                                            output: [
-                                                title: 'Code Coverage Analysis Running',
-                                                summary: "Running tests for ${service}",
-                                                text: 'Tests are in progress...'
-                                            ]
+                                        setGitHubPullRequestStatus(
+                                            context: "Test Code Coverage - ${service}",
+                                            state: 'PENDING',
+                                            message: "Running tests for ${service}..."
                                         )
                                     } catch (Exception e) {
-                                        echo "Warning: Failed to create GitHub check: ${e.message}"
+                                        echo "Warning: Failed to set GitHub PR status: ${e.message}"
                                     }
                                 }
                                 
@@ -156,19 +146,13 @@ pipeline {
                                     
                                     if (env.CHANGE_ID) {
                                         try {
-                                            githubChecks(
-                                                name: "Test Code Coverage - ${service}",
-                                                status: 'COMPLETED',
-                                                conclusion: 'FAILURE',
-                                                detailsURL: env.BUILD_URL,
-                                                output: [
-                                                    title: 'Tests Failed',
-                                                    summary: "Tests for ${service} have failed",
-                                                    text: 'Please check the build logs for test failure details.'
-                                                ]
+                                            setGitHubPullRequestStatus(
+                                                context: "Test Code Coverage - ${service}",
+                                                state: 'FAILURE',
+                                                message: "Tests for ${service} have failed"
                                             )
                                         } catch (Exception e) {
-                                            echo "Warning: Failed to update GitHub check: ${e.message}"
+                                            echo "Warning: Failed to update GitHub PR status: ${e.message}"
                                         }
                                     }
                                     
@@ -225,25 +209,19 @@ pipeline {
                                     
                                     // Update GitHub check for code coverage
                                     if (env.CHANGE_ID) {
-                                        def conclusion = coverageResult == 0 ? 'SUCCESS' : 'FAILURE'
+                                        def state = coverageResult == 0 ? 'SUCCESS' : 'FAILURE'
                                         def coverageFormatted = codeCoverage.indexOf(".") > 0 ? 
                                             codeCoverage.substring(0, codeCoverage.indexOf(".") + 2) : 
                                             codeCoverage
                                             
                                         try {
-                                            githubChecks(
-                                                name: "Test Code Coverage - ${service}",
-                                                status: 'COMPLETED',
-                                                conclusion: conclusion,
-                                                detailsURL: "${env.BUILD_URL}/jacoco/",
-                                                output: [
-                                                    title: conclusion == 'SUCCESS' ? 'Code Coverage Check Passed' : 'Code Coverage Check Failed',
-                                                    summary: "Coverage must be at least ${MINIMUM_COVERAGE}%. Your coverage of ${service} is ${coverageFormatted}%.",
-                                                    text: conclusion == 'SUCCESS' ? 'All tests pass with sufficient coverage.' : 'Increase test coverage and retry the build.'
-                                                ]
+                                            setGitHubPullRequestStatus(
+                                                context: "Test Code Coverage - ${service}",
+                                                state: state,
+                                                message: "Coverage: ${coverageFormatted}% (min: ${MINIMUM_COVERAGE}%)"
                                             )
                                         } catch (Exception e) {
-                                            echo "Warning: Failed to update GitHub check: ${e.message}"
+                                            echo "Warning: Failed to update GitHub PR status: ${e.message}"
                                         }
                                     }
                                     
@@ -258,19 +236,13 @@ pipeline {
                                     
                                     if (env.CHANGE_ID) {
                                         try {
-                                            githubChecks(
-                                                name: "Test Code Coverage - ${service}",
-                                                status: 'COMPLETED',
-                                                conclusion: 'FAILURE',
-                                                detailsURL: env.BUILD_URL,
-                                                output: [
-                                                    title: 'Coverage Check Error',
-                                                    summary: "Failed to analyze code coverage for ${service}",
-                                                    text: "Error: ${e.message}"
-                                                ]
+                                            setGitHubPullRequestStatus(
+                                                context: "Test Code Coverage - ${service}",
+                                                state: 'FAILURE',
+                                                message: "Failed to analyze code coverage for ${service}"
                                             )
                                         } catch (Exception e2) {
-                                            echo "Warning: Failed to update GitHub check: ${e2.message}"
+                                            echo "Warning: Failed to update GitHub PR status: ${e2.message}"
                                         }
                                     }
                                 }
@@ -282,36 +254,16 @@ pipeline {
                     
                     // Create summary report for PR
                     if (env.CHANGE_ID && !allCoverageResults.isEmpty()) {
-                        def summaryText = "## Coverage Summary\n\n"
-                        summaryText += "| Service | Coverage | Status |\n"
-                        summaryText += "|---------|----------|--------|\n"
-                        
-                        allCoverageResults.each { service, coverage ->
-                            def coverageNum = 0
-                            try {
-                                coverageNum = coverage.toFloat()
-                            } catch (Exception e) {
-                                coverageNum = 0
-                            }
-                            
-                            def status = coverageNum >= MINIMUM_COVERAGE.toFloat() ? "✅ Pass" : "❌ Fail"
-                            summaryText += "| ${service} | ${coverage}% | ${status} |\n"
-                        }
+                        def summaryText = "Coverage Summary - Minimum required: ${MINIMUM_COVERAGE}%"
                         
                         try {
-                            githubChecks(
-                                name: "Overall Coverage Summary",
-                                status: 'COMPLETED',
-                                conclusion: allServicesPass ? 'SUCCESS' : 'FAILURE',
-                                detailsURL: env.BUILD_URL,
-                                output: [
-                                    title: allServicesPass ? 'All Services Pass Coverage Checks' : 'Coverage Checks Failed',
-                                    summary: "Minimum required coverage: ${MINIMUM_COVERAGE}%",
-                                    text: summaryText
-                                ]
+                            setGitHubPullRequestStatus(
+                                context: "Overall Coverage Summary",
+                                state: allServicesPass ? 'SUCCESS' : 'FAILURE',
+                                message: summaryText
                             )
                         } catch (Exception e) {
-                            echo "Warning: Failed to create summary check: ${e.message}"
+                            echo "Warning: Failed to create summary status: ${e.message}"
                         }
                     }
                 }
@@ -334,18 +286,13 @@ pipeline {
                                 // Update GitHub check if this is a PR
                                 if (env.CHANGE_ID) {
                                     try {
-                                        githubChecks(
-                                            name: "Build - ${service}",
-                                            status: 'IN_PROGRESS',
-                                            detailsURL: env.BUILD_URL,
-                                            output: [
-                                                title: 'Building Service',
-                                                summary: "Building ${service}...",
-                                                text: 'Creating deployable artifact.'
-                                            ]
+                                        setGitHubPullRequestStatus(
+                                            context: "Build - ${service}",
+                                            state: 'PENDING',
+                                            message: "Building ${service}..."
                                         )
                                     } catch (Exception e) {
-                                        echo "Warning: Failed to create GitHub check: ${e.message}"
+                                        echo "Warning: Failed to set GitHub PR status: ${e.message}"
                                     }
                                 }
                                 
@@ -361,23 +308,15 @@ pipeline {
                                 
                                 // Update GitHub check for build result
                                 if (env.CHANGE_ID) {
-                                    def conclusion = buildResult == 0 ? 'SUCCESS' : 'FAILURE'
+                                    def state = buildResult == 0 ? 'SUCCESS' : 'FAILURE'
                                     try {
-                                        githubChecks(
-                                            name: "Build - ${service}",
-                                            status: 'COMPLETED',
-                                            conclusion: conclusion,
-                                            detailsURL: env.BUILD_URL,
-                                            output: [
-                                                title: conclusion == 'SUCCESS' ? 'Build Successful' : 'Build Failed',
-                                                summary: "${service} build ${conclusion == 'SUCCESS' ? 'completed successfully' : 'failed'}",
-                                                text: conclusion == 'SUCCESS' ? 
-                                                    "The artifact is ready for deployment." : 
-                                                    "The build process encountered errors. Check the logs for details."
-                                            ]
+                                        setGitHubPullRequestStatus(
+                                            context: "Build - ${service}",
+                                            state: state,
+                                            message: "${service} build ${state == 'SUCCESS' ? 'completed successfully' : 'failed'}"
                                         )
                                     } catch (Exception e) {
-                                        echo "Warning: Failed to update GitHub check: ${e.message}"
+                                        echo "Warning: Failed to update GitHub PR status: ${e.message}"
                                     }
                                 }
                             }
@@ -389,21 +328,15 @@ pipeline {
                     // Update overall CI status for PR
                     if (env.CHANGE_ID) {
                         try {
-                            githubChecks(
-                                name: "CI Pipeline",
-                                status: 'COMPLETED',
-                                conclusion: buildSuccess ? 'SUCCESS' : 'FAILURE',
-                                detailsURL: env.BUILD_URL,
-                                output: [
-                                    title: buildSuccess ? 'CI Pipeline Successful' : 'CI Pipeline Failed',
-                                    summary: buildSuccess ? 
-                                        "All services built successfully." : 
-                                        "One or more services failed to build.",
-                                    text: "Check individual service builds for details."
-                                ]
+                            setGitHubPullRequestStatus(
+                                context: "CI Pipeline",
+                                state: buildSuccess ? 'SUCCESS' : 'FAILURE',
+                                message: buildSuccess ? 
+                                    "All services built successfully." : 
+                                    "One or more services failed to build."
                             )
                         } catch (Exception e) {
-                            echo "Warning: Failed to update GitHub check: ${e.message}"
+                            echo "Warning: Failed to update GitHub PR status: ${e.message}"
                         }
                     }
                 }
@@ -412,6 +345,10 @@ pipeline {
     }
     
     post {
+        always {
+            echo 'Cleaning up...'
+            cleanWs()
+        }
         success {
             echo 'Pipeline completed successfully!'
         }
@@ -425,19 +362,13 @@ pipeline {
             script {
                 if (env.CHANGE_ID) {
                     try {
-                        githubChecks(
-                            name: "CI Pipeline",
-                            status: 'COMPLETED',
-                            conclusion: 'FAILURE',
-                            detailsURL: env.BUILD_URL,
-                            output: [
-                                title: 'CI Pipeline Failed',
-                                summary: "The pipeline encountered errors and could not complete successfully.",
-                                text: "Check the build logs for more details about the failure."
-                            ]
+                        setGitHubPullRequestStatus(
+                            context: "CI Pipeline",
+                            state: 'FAILURE',
+                            message: "The pipeline encountered errors and could not complete successfully."
                         )
                     } catch (Exception e) {
-                        echo "Warning: Failed to update GitHub check: ${e.message}"
+                        echo "Warning: Failed to update GitHub PR status: ${e.message}"
                     }
                 }
             }
