@@ -1,21 +1,22 @@
 package org.springframework.samples.petclinic.customers;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-@SpringBootTest
 class CustomersServiceApplicationTest {
+
     @Test
-    void shouldBootstrapContext() {
-        // Arrange
-        CustomersServiceApplication application = new CustomersServiceApplication();
-
-        // Act
-        CustomersServiceApplication.main(new String[]{});
-
-        // Assert
-        assertThat(application).isNotNull();
+    void mainMethodStartsApplication() {
+        assertDoesNotThrow(() -> {
+            ConfigurableApplicationContext context = SpringApplication.run(
+                CustomersServiceApplication.class, 
+                "--spring.profiles.active=test",
+                "--server.port=0"
+            );
+            context.close(); // Tắt context ngay sau khi khởi động
+        });
     }
 }
