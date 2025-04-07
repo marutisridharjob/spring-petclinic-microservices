@@ -414,7 +414,9 @@ pipeline {
     post {
         always {
             // Clean workspace after build
-            cleanWs()
+            node {
+                cleanWs()
+            }
         }
         success {
             echo 'Pipeline completed successfully!'
