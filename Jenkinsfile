@@ -414,9 +414,10 @@ pipeline {
     post {
         always {
             // Clean workspace after build
-            node {
-                cleanWs()
-            }
+            cleanWs(cleanWhenNotBuilt: false,
+                    deleteDirs: true,
+                    disableDeferredWipeout: true,
+                    notFailBuild: true)
         }
         success {
             echo 'Pipeline completed successfully!'
