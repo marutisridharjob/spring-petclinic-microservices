@@ -172,7 +172,8 @@ pipeline {
                                         }
                                     }
                                     
-                                    continue
+                                    // Skip rest of processing for this service
+                                    return // Using return instead of continue
                                 }
                                 
                                 try {
