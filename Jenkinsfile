@@ -272,56 +272,57 @@ pipeline {
         
         stage('Test') {
             parallel {
-                stage('Customers Service') {
-                    when {
-                        expression { return env.CUSTOMERS_SERVICE_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(CUSTOMERS_SERVICE_PATH) {
-                            sh 'mvn verify'
-                            echo "Customers Service tests completed with coverage check"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${CUSTOMERS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
-                }
+                stage('Customers Service') { 
+                    when { 
+                        expression { return env.CUSTOMERS_SERVICE_CHANGED == "true" } 
+                    } 
+                    steps { 
+                        dir(CUSTOMERS_SERVICE_PATH) { 
+                            sh 'mvn test' 
+                            echo "Customers Service tests completed" 
+                        } 
+                    } 
+                    post { 
+                        always { 
+                            junit allowEmptyResults: true, testResults: "${CUSTOMERS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml" 
+                        } 
+                    } 
+                } 
 
-                stage('Visits Service') {
-                    when {
-                        expression { return env.VISITS_SERVICE_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(VISITS_SERVICE_PATH) {
-                            sh 'mvn verify'
-                            echo "Visits Service tests completed with coverage check"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${VISITS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
-                }
+                stage('Visits Service') { 
+                    when { 
+                        expression { return env.VISITS_SERVICE_CHANGED == "true" } 
+                    } 
+                    steps { 
+                        dir(VISITS_SERVICE_PATH) { 
+                            sh 'mvn test' 
+                            echo "Visits Service tests completed" 
+                        } 
+                    } 
+                    post { 
+                        always { 
+                            junit allowEmptyResults: true, testResults: "${VISITS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml" 
+                        } 
+                    } 
+                } 
 
-                stage('Vets Service') {
-                    when {
-                        expression { return env.VETS_SERVICE_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(VETS_SERVICE_PATH) {
-                            sh 'mvn verify'
-                            echo "Vets Service tests completed with coverage check"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${VETS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
+                stage('Vets Service') { 
+                    when { 
+                        expression { return env.VETS_SERVICE_CHANGED == "true" } 
+                    } 
+                    steps { 
+                        dir(VETS_SERVICE_PATH) { 
+                            sh 'mvn test' 
+                            echo "Vets Service tests completed" 
+                        } 
+                    } 
+                    post { 
+                        always { 
+                            junit allowEmptyResults: true, testResults: "${VETS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml" 
+                        } 
+                    } 
                 }
+                
             }
         }
     }
