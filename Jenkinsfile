@@ -286,7 +286,6 @@ pipeline {
                                 classPattern: '**/target/classes',
                                 sourcePattern: '**/src/main/java',
                                 exclusionPattern: '**/test/**',
-                                minimumLineCoverage: '70',
                                 changeBuildStatus: true,
                             )
                         }
@@ -304,8 +303,16 @@ pipeline {
                     } 
                     steps { 
                         dir(VISITS_SERVICE_PATH) { 
-                            sh 'mvn test' 
-                            echo "Visits Service tests completed" 
+                            sh 'mvn verify' 
+                            echo "Visits Service tests and coverage completed"
+
+                            jacoco(
+                                execPattern: '**/target/jacoco.exec',
+                                classPattern: '**/target/classes',
+                                sourcePattern: '**/src/main/java',
+                                exclusionPattern: '**/test/**',
+                                changeBuildStatus: true,
+                            ) 
                         } 
                     } 
                     post { 
@@ -321,8 +328,16 @@ pipeline {
                     } 
                     steps { 
                         dir(VETS_SERVICE_PATH) { 
-                            sh 'mvn test' 
-                            echo "Vets Service tests completed" 
+                            sh 'mvn verify' 
+                            echo "Vets Service tests and coverage completed" 
+
+                            jacoco(
+                                execPattern: '**/target/jacoco.exec',
+                                classPattern: '**/target/classes',
+                                sourcePattern: '**/src/main/java',
+                                exclusionPattern: '**/test/**',
+                                changeBuildStatus: true,
+                            )
                         } 
                     } 
                     post { 
