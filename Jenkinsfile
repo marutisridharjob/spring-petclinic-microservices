@@ -278,9 +278,18 @@ pipeline {
                     } 
                     steps { 
                         dir(CUSTOMERS_SERVICE_PATH) { 
-                            sh 'mvn test' 
-                            echo "Customers Service tests completed" 
-                        } 
+                            sh 'mvn verify' 
+                            echo "Customers Service tests and coverage completed"
+
+                            jacoco(
+                                execPattern: '**/target/jacoco.exec',
+                                classPattern: '**/target/classes',
+                                sourcePattern: '**/src/main/java',
+                                exclusionPattern: '**/test/**',
+                                minimumLineCoverage: '70',
+                                changeBuildStatus: true,
+                            )
+                        }
                     } 
                     post { 
                         always { 
