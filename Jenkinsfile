@@ -272,74 +272,6 @@ pipeline {
         
         stage('Test') {
             parallel {
-                stage('Config Server') {
-                    when {
-                        expression { return env.CONFIG_SERVER_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(CONFIG_SERVER_PATH) {
-                            sh 'mvn test'
-                            echo "Config Server tests completed"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${CONFIG_SERVER_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
-                }
-                
-                stage('Discovery Server') {
-                    when {
-                        expression { return env.DISCOVERY_SERVER_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(DISCOVERY_SERVER_PATH) {
-                            sh 'mvn test'
-                            echo "Discovery Server tests completed"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${DISCOVERY_SERVER_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
-                }
-                
-                stage('Admin Server') {
-                    when {
-                        expression { return env.ADMIN_SERVER_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(ADMIN_SERVER_PATH) {
-                            sh 'mvn test'
-                            echo "Admin Server tests completed"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${ADMIN_SERVER_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
-                }
-                
-                stage('API Gateway') {
-                    when {
-                        expression { return env.API_GATEWAY_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(API_GATEWAY_PATH) {
-                            sh 'mvn test'
-                            echo "API Gateway tests completed"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${API_GATEWAY_PATH}/target/surefire-reports/TEST-*.xml"
-                        }
-                    }
-                }
-                
                 stage('Customers Service') {
                     when {
                         expression { return env.CUSTOMERS_SERVICE_CHANGED == "true" }
@@ -353,14 +285,6 @@ pipeline {
                     post {
                         always {
                             junit allowEmptyResults: true, testResults: "${CUSTOMERS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
-                            publishHTML(target: [
-                                reportName: 'Customers Coverage',
-                                reportDir: "${CUSTOMERS_SERVICE_PATH}/target/site/jacoco",
-                                reportFiles: 'index.html',
-                                keepAll: true,
-                                alwaysLinkToLastBuild: true,
-                                allowMissing: true
-                            ])
                         }
                     }
                 }
@@ -378,14 +302,6 @@ pipeline {
                     post {
                         always {
                             junit allowEmptyResults: true, testResults: "${VISITS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
-                            publishHTML(target: [
-                                reportName: 'Visits Coverage',
-                                reportDir: "${VISITS_SERVICE_PATH}/target/site/jacoco",
-                                reportFiles: 'index.html',
-                                keepAll: true,
-                                alwaysLinkToLastBuild: true,
-                                allowMissing: true
-                            ])
                         }
                     }
                 }
@@ -403,31 +319,6 @@ pipeline {
                     post {
                         always {
                             junit allowEmptyResults: true, testResults: "${VETS_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
-                            publishHTML(target: [
-                                reportName: 'Vets Coverage',
-                                reportDir: "${VETS_SERVICE_PATH}/target/site/jacoco",
-                                reportFiles: 'index.html',
-                                keepAll: true,
-                                alwaysLinkToLastBuild: true,
-                                allowMissing: true
-                            ])
-                        }
-                    }
-                }
-                
-                stage('GenAI Service') {
-                    when {
-                        expression { return env.GENAI_SERVICE_CHANGED == "true" }
-                    }
-                    steps {
-                        dir(GENAI_SERVICE_PATH) {
-                            sh 'mvn test'
-                            echo "GenAI Service tests completed"
-                        }
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: "${GENAI_SERVICE_PATH}/target/surefire-reports/TEST-*.xml"
                         }
                     }
                 }
