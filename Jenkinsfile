@@ -1,46 +1,41 @@
 def detectChanges() {
-    def services = [
+    def branch_name = ""
+
+    // Xác định branch để so sánh
+    if (env.CHANGE_ID) {
+        branch_name = "${env.CHANGE_TARGET}"
+        // Fetch branch chính nếu là Pull Request
+        sh "git fetch origin ${branch_name}:${branch_name} --no-tags"
+    } else {
+        branch_name = "HEAD~1"
+    }
+
+    // Lấy danh sách các file thay đổi
+    def changedFiles = sh(script: "git diff --name-only ${branch_name}", returnStdout: true).trim()
+    echo "Changed files:\n${changedFiles}"
+
+    // Danh sách các thư mục service
+    def folderList = [
+        'spring-petclinic-customers-service',
+        'spring-petclinic-vets-service',
+        'spring-petclinic-visits-service',
         'spring-petclinic-admin-server',
         'spring-petclinic-api-gateway',
         'spring-petclinic-config-server',
-        'spring-petclinic-customers-service',
         'spring-petclinic-discovery-server',
-        'spring-petclinic-genai-service',
-        'spring-petclinic-vets-service',
-        'spring-petclinic-visits-service'
+        'spring-petclinic-genai-service'
     ]
-    
-    def changedServices = []
-    
-    // For pull requests
-    if (env.CHANGE_ID) {
-        echo "Processing Pull Request #${env.CHANGE_ID}"
-        for (service in services) {
-            def changes = sh(script: "git diff --name-only origin/${env.CHANGE_TARGET} HEAD | grep ^${service}/", returnStatus: true)
-            if (changes == 0) {
-                echo "Detected changes in ${service}"
-                changedServices.add(service)
-            }
-        }
-    } 
-    // For branches
-    else {
-        echo "Processing branch ${env.BRANCH_NAME}"
-        for (service in services) {
-            def changes = sh(script: "git diff --name-only HEAD~1 HEAD | grep ^${service}/", returnStatus: true)
-            if (changes == 0) {
-                echo "Detected changes in ${service}"
-                changedServices.add(service)
-            }
-        }
-    }
-    
-    if (changedServices.size() == 0) {
-        echo "No service-specific changes detected, will build common components"
-        return ['spring-petclinic-config-server', 'spring-petclinic-discovery-server']
-    }
-    
-    return changedServices
+
+    // Lọc các thư mục service có thay đổi
+    def changedFolders = changedFiles.split('\n')
+        .collect { it.split('/')[0] } // Lấy thư mục gốc
+        .unique() // Loại bỏ trùng lặp
+        .findAll { folderList.contains(it) } // Chỉ giữ lại các thư mục trong danh sách folderList
+
+    echo "Changed Folders:\n${changedFolders.join('\n')}"
+
+    // Trả về danh sách các service có thay đổi
+    return changedFolders
 }
 
 pipeline {
@@ -170,10 +165,10 @@ pipeline {
                         dir(service) {
                             echo "Checking code coverage for ${service}..."
                             
-                            // Kiểm tra độ phủ code và fail nếu dưới 70%
-                            // Chạy riêng các goal của JaCoCo
+                            // Chạy JaCoCo để tạo báo cáo coverage
                             sh "mvn jacoco:report"
                             
+                            // Kiểm tra độ phủ code
                             def jacocoResult = sh(script: """
                                 # Extract coverage percentage from JaCoCo report
                                 COVERAGE_FILE=\$(find target/site/jacoco -name "jacoco.xml" | head -n 1)
@@ -204,7 +199,34 @@ pipeline {
                                 fi
                             """, returnStatus: true)
                             
-                            if (jacocoResult != 0) {
+                            // Lấy giá trị coverage để cập nhật GitHub Checks
+                            def codeCoverage = sh(script: """
+                                COVERAGE_FILE=\$(find target/site/jacoco -name "jacoco.xml" | head -n 1)
+                                COVERED=\$(grep -oP 'covered="\\d+"' \$COVERAGE_FILE | head -n 1 | grep -oP '\\d+')
+                                MISSED=\$(grep -oP 'missed="\\d+"' \$COVERAGE_FILE | head -n 1 | grep -oP '\\d+')
+                                TOTAL=\$((\$COVERED + \$MISSED))
+                                echo \$(echo "scale=2; 100 * \$COVERED / \$TOTAL" | bc)
+                            """, returnStdout: true).trim()
+                            
+                            // Cập nhật GitHub Checks bằng publishChecks
+                            if (jacocoResult == 0) {
+                                publishChecks(
+                                    name: 'Test Code Coverage',
+                                    title: 'Code Coverage Check Success!',
+                                    summary: 'All test code coverage is greater than 70%',
+                                    text: 'Check Success!',
+                                    detailsURL: env.BUILD_URL,
+                                    conclusion: 'SUCCESS'
+                                )
+                            } else {
+                                publishChecks(
+                                    name: 'Test Code Coverage',
+                                    title: 'Code Coverage Check Failed!',
+                                    summary: "Coverage must be at least 70%. Your coverage is ${codeCoverage}%.",
+                                    text: 'Increase test coverage and retry the build.',
+                                    detailsURL: env.BUILD_URL,
+                                    conclusion: 'FAILURE'
+                                )
                                 error "Code coverage check failed for ${service}. Coverage must be at least 70%."
                             }
                         }
