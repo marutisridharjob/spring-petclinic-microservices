@@ -44,10 +44,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class VetResourceTest {
 
     @Autowired
-    MockMvc mvc;
+    private MockMvc mvc;
 
     @MockitoBean
-    VetRepository vetRepository;
+    private VetRepository vetRepository;
 
     @Test
     public void getVets_vetsReturned_success() throws Exception {
