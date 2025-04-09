@@ -65,9 +65,9 @@ pipeline {
                             echo "Adding JaCoCo plugin to ${service}..."
                             
                             sh '''
-                                if ! grep -q "jacoco-maven-plugin" pom.xml; then
-                                    # Tạo file tạm để lưu nội dung cập nhật
-                                    sed '/<\\/dependencies>/a\\
+                                if ! grep -q "<build>" pom.xml; then
+                                    # Thêm thẻ <build> nếu chưa tồn tại
+                                    sed -i '/<\\/dependencies>/a\\
                                     <build>\\
                                         <plugins>\\
                                             <plugin>\\
@@ -110,9 +110,7 @@ pipeline {
                                                 </executions>\\
                                             </plugin>\\
                                         </plugins>\\
-                                    </build>\\
-                                    ' pom.xml > pom_updated.xml
-                                    mv pom_updated.xml pom.xml
+                                    </build>' pom.xml
                                 fi
                             '''
                         }
