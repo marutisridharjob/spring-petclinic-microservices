@@ -9,7 +9,6 @@ def services = [
     'spring-petclinic-visits-service'
 ]
 
-
 // Detect which services have changes
 def detectChanges() {
     def changedServices = []
