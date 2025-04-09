@@ -1,4 +1,4 @@
-def services = [
+@Field def services = [
     'spring-petclinic-admin-server',
     'spring-petclinic-api-gateway',
     'spring-petclinic-config-server',
