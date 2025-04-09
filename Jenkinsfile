@@ -65,56 +65,57 @@ pipeline {
                             echo "Adding JaCoCo plugin to ${service}..."
                             
                             sh '''
-                                if ! grep -q "jacoco-maven-plugin" pom.xml; then
-                                    # Tạo file tạm để lưu nội dung cập nhật
-                                    sed '/<\\/dependencies>/a\\
-                                    <build>\\
-                                        <plugins>\\
-                                            <plugin>\\
-                                                <groupId>org.jacoco</groupId>\\
-                                                <artifactId>jacoco-maven-plugin</artifactId>\\
-                                                <version>0.8.7</version>\\
-                                                <executions>\\
-                                                    <execution>\\
-                                                        <goals>\\
-                                                            <goal>prepare-agent</goal>\\
-                                                        </goals>\\
-                                                    </execution>\\
-                                                    <execution>\\
-                                                        <id>report</id>\\
-                                                        <phase>prepare-package</phase>\\
-                                                        <goals>\\
-                                                            <goal>report</goal>\\
-                                                        </goals>\\
-                                                    </execution>\\
-                                                    <execution>\\
-                                                        <id>jacoco-check</id>\\
-                                                        <goals>\\
-                                                            <goal>check</goal>\\
-                                                        </goals>\\
-                                                        <configuration>\\
-                                                            <rules>\\
-                                                                <rule>\\
-                                                                    <element>BUNDLE</element>\\
-                                                                    <limits>\\
-                                                                        <limit>\\
-                                                                            <counter>INSTRUCTION</counter>\\
-                                                                            <value>COVEREDRATIO</value>\\
-                                                                            <minimum>0.70</minimum>\\
-                                                                        </limit>\\
-                                                                    </limits>\\
-                                                                </rule>\\
-                                                            </rules>\\
-                                                        </configuration>\\
-                                                    </execution>\\
-                                                </executions>\\
-                                            </plugin>\\
-                                        </plugins>\\
-                                    </build>\\
-                                    ' pom.xml > pom_updated.xml
-                                    mv pom_updated.xml pom.xml
-                                fi
-                            '''
+                            if ! grep -q "jacoco-maven-plugin" pom.xml; then
+                                # Tạo file tạm để lưu nội dung cập nhật
+                                sed '/<\\/dependencies>/a\\
+                                </dependencies>\\
+                                <build>\\
+                                    <plugins>\\
+                                        <plugin>\\
+                                            <groupId>org.jacoco</groupId>\\
+                                            <artifactId>jacoco-maven-plugin</artifactId>\\
+                                            <version>0.8.7</version>\\
+                                            <executions>\\
+                                                <execution>\\
+                                                    <goals>\\
+                                                        <goal>prepare-agent</goal>\\
+                                                    </goals>\\
+                                                </execution>\\
+                                                <execution>\\
+                                                    <id>report</id>\\
+                                                    <phase>prepare-package</phase>\\
+                                                    <goals>\\
+                                                        <goal>report</goal>\\
+                                                    </goals>\\
+                                                </execution>\\
+                                                <execution>\\
+                                                    <id>jacoco-check</id>\\
+                                                    <goals>\\
+                                                        <goal>check</goal>\\
+                                                    </goals>\\
+                                                    <configuration>\\
+                                                        <rules>\\
+                                                            <rule>\\
+                                                                <element>BUNDLE</element>\\
+                                                                <limits>\\
+                                                                    <limit>\\
+                                                                        <counter>INSTRUCTION</counter>\\
+                                                                        <value>COVEREDRATIO</value>\\
+                                                                        <minimum>0.70</minimum>\\
+                                                                    </limit>\\
+                                                                </limits>\\
+                                                            </rule>\\
+                                                        </rules>\\
+                                                    </configuration>\\
+                                                </execution>\\
+                                            </executions>\\
+                                        </plugin>\\
+                                    </plugins>\\
+                                </build>\\
+                                ' pom.xml > pom_updated.xml
+                                mv pom_updated.xml pom.xml
+                            fi
+                        '''
                         }
                     }
                 }
