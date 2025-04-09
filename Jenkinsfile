@@ -61,52 +61,14 @@ pipeline {
             }
         }
         
-        stage('Test') {
+        stage('Add JaCoCo Plugin') {
             steps {
                 script {
                     def changedServicesList = env.CHANGED_SERVICES.split(',')
                     for (service in changedServicesList) {
                         dir(service) {
-                            echo "Testing ${service}..."
-                            // Thêm JaCoCo agent vào Maven test để tạo báo cáo độ phủ
-                            sh "mvn -B clean test jacoco:prepare-agent test jacoco:report"
-                        }
-                    }
-                }
-            }
-            post {
-                always {
-                    script {
-                        def changedServicesList = env.CHANGED_SERVICES.split(',')
-                        for (service in changedServicesList) {
-                            dir(service) {
-                                // Collect JUnit test results
-                                junit 'target/surefire-reports/*.xml'
-                                
-                                // Collect JaCoCo coverage results
-                                jacoco(
-                                    execPattern: 'target/jacoco.exec',
-                                    classPattern: 'target/classes',
-                                    sourcePattern: 'src/main/java',
-                                    exclusionPattern: 'src/test*'
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Coverage Check') {
-            steps {
-                script {
-                    def changedServicesList = env.CHANGED_SERVICES.split(',')
-                    for (service in changedServicesList) {
-                        dir(service) {
-                            echo "Checking code coverage for ${service}..."
+                            echo "Adding JaCoCo plugin to ${service}..."
                             
-                            // Thêm JaCoCo maven plugin để kiểm tra độ phủ
-                            // Thêm plugin JaCoCo vào pom.xml (nếu chưa có)
                             sh '''
                                 if ! grep -q "jacoco-maven-plugin" pom.xml; then
                                     # Tạo file tạm để lưu nội dung cập nhật
@@ -158,8 +120,60 @@ pipeline {
                                     mv pom_updated.xml pom.xml
                                 fi
                             '''
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                script {
+                    def changedServicesList = env.CHANGED_SERVICES.split(',')
+                    for (service in changedServicesList) {
+                        dir(service) {
+                            echo "Testing ${service}..."
+                            // Chỉ chạy test và sử dụng JaCoCo sau khi đã thêm plugin
+                            sh "mvn -B clean test"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    script {
+                        def changedServicesList = env.CHANGED_SERVICES.split(',')
+                        for (service in changedServicesList) {
+                            dir(service) {
+                                // Collect JUnit test results
+                                junit 'target/surefire-reports/*.xml'
+                                
+                                // Collect JaCoCo coverage results (nếu tệp tồn tại)
+                                jacoco(
+                                    execPattern: 'target/jacoco.exec',
+                                    classPattern: 'target/classes',
+                                    sourcePattern: 'src/main/java',
+                                    exclusionPattern: 'src/test*'
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Coverage Check') {
+            steps {
+                script {
+                    def changedServicesList = env.CHANGED_SERVICES.split(',')
+                    for (service in changedServicesList) {
+                        dir(service) {
+                            echo "Checking code coverage for ${service}..."
                             
                             // Kiểm tra độ phủ code và fail nếu dưới 70%
+                            // Chạy riêng các goal của JaCoCo
+                            sh "mvn jacoco:report"
+                            
                             def jacocoResult = sh(script: """
                                 # Extract coverage percentage from JaCoCo report
                                 COVERAGE_FILE=\$(find target/site/jacoco -name "jacoco.xml" | head -n 1)
