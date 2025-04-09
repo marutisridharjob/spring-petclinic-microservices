@@ -65,55 +65,9 @@ pipeline {
                             echo "Adding JaCoCo plugin to ${service}..."
                             
                             sh '''
-                            if ! grep -q "jacoco-maven-plugin" pom.xml; then
-                                # Check if build tag exists
-                                if grep -q "<build>" pom.xml; then
-                                    # Add plugin to existing build/plugins section
-                                    sed -i '/<\\/plugins>/i\\
-                                    <plugin>\\
-                                        <groupId>org.jacoco</groupId>\\
-                                        <artifactId>jacoco-maven-plugin</artifactId>\\
-                                        <version>0.8.7</version>\\
-                                        <executions>\\
-                                            <execution>\\
-                                                <goals>\\
-                                                    <goal>prepare-agent</goal>\\
-                                                </goals>\\
-                                            </execution>\\
-                                            <execution>\\
-                                                <id>report</id>\\
-                                                <phase>prepare-package</phase>\\
-                                                <goals>\\
-                                                    <goal>report</goal>\\
-                                                </goals>\\
-                                            </execution>\\
-                                            <execution>\\
-                                                <id>jacoco-check</id>\\
-                                                <goals>\\
-                                                    <goal>check</goal>\\
-                                                </goals>\\
-                                                <configuration>\\
-                                                    <rules>\\
-                                                        <rule>\\
-                                                            <element>BUNDLE</element>\\
-                                                            <limits>\\
-                                                                <limit>\\
-                                                                    <counter>INSTRUCTION</counter>\\
-                                                                    <value>COVEREDRATIO</value>\\
-                                                                    <minimum>0.70</minimum>\\
-                                                                </limit>\\
-                                                            </limits>\\
-                                                        </rule>\\
-                                                    </rules>\\
-                                                </configuration>\\
-                                            </execution>\\
-                                        </executions>\\
-                                    </plugin>\\
-                                    ' pom.xml
-                                else
-                                    # Create build section if it doesn't exist
-                                    # Insert before the project closing tag
-                                    sed -i '/<\\/project>/i\\
+                                if ! grep -q "jacoco-maven-plugin" pom.xml; then
+                                    # Tạo file tạm để lưu nội dung cập nhật
+                                    sed '/<\\/dependencies>/a\\
                                     <build>\\
                                         <plugins>\\
                                             <plugin>\\
@@ -157,9 +111,9 @@ pipeline {
                                             </plugin>\\
                                         </plugins>\\
                                     </build>\\
-                                    ' pom.xml
+                                    ' pom.xml > pom_updated.xml
+                                    mv pom_updated.xml pom.xml
                                 fi
-                            fi
                             '''
                         }
                     }
