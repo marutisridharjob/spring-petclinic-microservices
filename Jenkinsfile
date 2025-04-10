@@ -31,7 +31,7 @@ def detectChanges() {
 
     if (changedFolders.size() == 0) {
         echo "No changes detected. Using default services."
-        changedFolders = ['spring-petclinic-customers-service', 'spring-petclinic-vets-service']
+        changedFolders = ['spring-petclinic-discovery-server', 'spring-petclinic-config-server']
     }
 
     return changedFolders
