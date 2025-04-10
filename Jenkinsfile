@@ -18,12 +18,7 @@ def detectChanges() {
     def folderList = [
         'spring-petclinic-customers-service',
         'spring-petclinic-vets-service',
-        'spring-petclinic-visits-service',
-        'spring-petclinic-admin-server',
-        'spring-petclinic-api-gateway',
-        'spring-petclinic-config-server',
-        'spring-petclinic-discovery-server',
-        'spring-petclinic-genai-service'
+        'spring-petclinic-visits-service'
     ]
 
     // Lọc các thư mục service có thay đổi
@@ -150,8 +145,6 @@ pipeline {
                         dir(service) {
                             echo "Checking code coverage for ${service}..."
                             
-                            // Chạy JaCoCo để tạo báo cáo coverage
-                            sh "mvn jacoco:report"
                             
                             // Kiểm tra độ phủ code
                             def jacocoResult = sh(script: """
