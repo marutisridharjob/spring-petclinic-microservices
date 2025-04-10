@@ -35,7 +35,7 @@ def detectChanges() {
     echo "Changed Folders:\n${changedFolders.join('\n')}"
 
     // Nếu không có thay đổi, trả về hai service mặc định
-    if (changedFolders.isEmpty()) {
+    if (changedFolders.size() == 0) {
         echo "No changes detected. Using default services."
         changedFolders = ['spring-petclinic-customers-service', 'spring-petclinic-vets-service']
     }
