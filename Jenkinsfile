@@ -117,96 +117,70 @@ pipeline {
         stage('Test') {
             steps {
                 script {
-                    def changedServicesList = env.CHANGED_SERVICES.split(',')
-                    for (service in changedServicesList) {
-                        dir(service) {
-                            echo "Testing ${service}..."
-                            // Chỉ chạy test và sử dụng JaCoCo sau khi đã thêm plugin
-                            sh "mvn test"
-                            
-                            // Generate JaCoCo HTML Report
-                            jacoco(
-                                classPattern: "**/${service}/target/classes",
-                                execPattern: "**/${service}/target/jacoco.exec",
-                                sourcePattern: "**/${service}/src/main/java",
-                                runAlways: true
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Coverage Check') {
-            steps {
-                script {
-                    def changedServicesList = env.CHANGED_SERVICES.split(',')
-                    for (service in changedServicesList) {
-                        dir(service) {
-                            echo "Checking code coverage for ${service}..."
-                            
-                            
-                            // Kiểm tra độ phủ code
-                            def jacocoResult = sh(script: """
-                                # Extract coverage percentage from JaCoCo report
-                                COVERAGE_FILE=\$(find target/site/jacoco -name "jacoco.xml" | head -n 1)
-                                
-                                if [ ! -f "\$COVERAGE_FILE" ]; then
-                                    echo "No JaCoCo coverage file found!"
-                                    exit 1
-                                fi
-                                
-                                # Tính tỉ lệ phần trăm các dòng được test
-                                COVERED=\$(grep -oP 'covered="\\d+"' \$COVERAGE_FILE | head -n 1 | grep -oP '\\d+')
-                                MISSED=\$(grep -oP 'missed="\\d+"' \$COVERAGE_FILE | head -n 1 | grep -oP '\\d+')
-                                
-                                TOTAL=\$((\$COVERED + \$MISSED))
-                                if [ \$TOTAL -eq 0 ]; then
-                                    echo "No code to cover!"
-                                    exit 1
-                                fi
-                                
-                                COVERAGE_PCT=\$(echo "scale=2; 100 * \$COVERED / \$TOTAL" | bc)
-                                echo "Code coverage: \$COVERAGE_PCT%"
-                                
-                                if (( \$(echo "\$COVERAGE_PCT < 70" | bc -l) )); then
-                                    echo "Code coverage is below 70%"
-                                    exit 1
-                                else
-                                    echo "Code coverage is sufficient (>=70%)"
-                                fi
-                            """, returnStatus: true)
-                            
-                            // Lấy giá trị coverage để cập nhật GitHub Checks
-                            def codeCoverage = sh(script: """
-                                COVERAGE_FILE=\$(find target/site/jacoco -name "jacoco.xml" | head -n 1)
-                                COVERED=\$(grep -oP 'covered="\\d+"' \$COVERAGE_FILE | head -n 1 | grep -oP '\\d+')
-                                MISSED=\$(grep -oP 'missed="\\d+"' \$COVERAGE_FILE | head -n 1 | grep -oP '\\d+')
-                                TOTAL=\$((\$COVERED + \$MISSED))
-                                echo \$(echo "scale=2; 100 * \$COVERED / \$TOTAL" | bc)
-                            """, returnStdout: true).trim()
-                            
-                            // Cập nhật GitHub Checks bằng publishChecks
-                            if (jacocoResult == 0) {
-                                publishChecks(
-                                    name: 'Test Code Coverage',
-                                    title: 'Code Coverage Check Success!',
-                                    summary: 'All test code coverage is greater than 70%',
-                                    text: 'Check Success!',
-                                    detailsURL: env.BUILD_URL,
-                                    conclusion: 'SUCCESS'
-                                )
-                            } else {
-                                publishChecks(
-                                    name: 'Test Code Coverage',
-                                    title: 'Code Coverage Check Failed!',
-                                    summary: "Coverage must be at least 70%. Your coverage is ${codeCoverage}%.",
-                                    text: 'Increase test coverage and retry the build.',
-                                    detailsURL: env.BUILD_URL,
-                                    conclusion: 'FAILURE'
-                                )
-                                error "Code coverage check failed for ${service}. Coverage must be at least 70%."
+                    def modules = env.CHANGED_SERVICES ? env.CHANGED_SERVICES.split(',') : []
+
+                    for (module in modules) {
+                        def testCommand = "mvn test -pl ${module}"
+                        echo "Running tests for affected modules: ${module}"
+                        sh "${testCommand}"
+
+                        // Generate JaCoCo HTML Report
+                        jacoco(
+                            classPattern: "**/${module}/target/classes",
+                            execPattern: "**/${module}/target/coverage-reports/jacoco.exec",
+                            sourcePattern: "**/${module}/src/main/java",
+                            runAlways: true
+                        )
+
+                        // Publish HTML Artifact of Code Coverage Report
+                        publishHTML(
+                            target: [
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: "${module}/target/site/jacoco",
+                                reportFiles: "index.html",
+                                reportName: "${module}_code_coverage_report_${env.COMMIT_HASH}_${env.BUILD_ID}"
+                            ]
+                        )
+
+                        // Get Code Coverage
+                        def codeCoverages = []
+                        def coverageReport = readFile(file: "${WORKSPACE}/${module}/target/site/jacoco/index.html")
+                        def matcher = coverageReport =~ /<tfoot>(.*?)<\/tfoot>/
+                        if (matcher.find()) {
+                            def coverage = matcher[0][1]
+                            def instructionMatcher = coverage =~ /<td class="ctr2">(.*?)<\/td>/
+                            if (instructionMatcher.find()) {
+                                def coveragePercentage = instructionMatcher[0][1]
+                                echo "Overall code coverage of ${module}: ${coveragePercentage}%"
+
+                                codeCoverages.add(coveragePercentage)
                             }
+                        }
+
+                        env.CODE_COVERAGES = codeCoverages.join(',')
+
+                        // Cập nhật GitHub Checks bằng publishChecks
+                        if (coveragePercentage.toFloat() >= 70) {
+                            publishChecks(
+                                name: 'Test Code Coverage',
+                                title: 'Code Coverage Check Success!',
+                                summary: 'All test code coverage is greater than 70%',
+                                text: 'Check Success!',
+                                detailsURL: env.BUILD_URL,
+                                conclusion: 'SUCCESS'
+                            )
+                        } else {
+                            publishChecks(
+                                name: 'Test Code Coverage',
+                                title: 'Code Coverage Check Failed!',
+                                summary: "Coverage must be at least 70%. Your coverage is ${coveragePercentage}%.",
+                                text: 'Increase test coverage and retry the build.',
+                                detailsURL: env.BUILD_URL,
+                                conclusion: 'FAILURE'
+                            )
+                            error "Code coverage check failed for ${module}. Coverage must be at least 70%."
                         }
                     }
                 }
