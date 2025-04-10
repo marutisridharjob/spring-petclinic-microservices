@@ -127,7 +127,7 @@ pipeline {
                         dir(service) {
                             echo "Testing ${service}..."
                             // Chỉ chạy test và sử dụng JaCoCo sau khi đã thêm plugin
-                            sh "mvn -B clean test"
+                            sh "mvn -B test"
                         }
                     }
                 }
@@ -240,7 +240,7 @@ pipeline {
                     for (service in changedServicesList) {
                         dir(service) {
                             echo "Building ${service}..."
-                            sh "mvn clean package -DskipTests"
+                            sh "mvn package -DskipTests"
                         }
                     }
                 }
