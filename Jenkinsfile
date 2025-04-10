@@ -68,7 +68,7 @@ pipeline {
                     def changedServicesList = env.CHANGED_SERVICES ? env.CHANGED_SERVICES.split(',') : []
 
                     // Nếu không có service nào thay đổi, sử dụng danh sách service mặc định
-                    if (changedServicesList == null || changedServicesList.isEmpty()) {
+                    if (changedServicesList.size() == 0) {
                         echo "No services changed. Adding JaCoCo plugin to default services."
                         changedServicesList = ['spring-petclinic-customers-service', 'spring-petclinic-vets-service']
                     }
