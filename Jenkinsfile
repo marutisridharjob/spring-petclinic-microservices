@@ -105,7 +105,10 @@ pipeline {
 
                         codeCoverages.add("${module}: ${coveragePercentage}%")
 
-                        if (coveragePercentage.toFloat() >= 70) {
+                        // Remove '%' and convert to float
+                        def coverageValue = coveragePercentage.replace('%', '').toFloat()
+
+                        if (coverageValue >= 70) {
                             publishChecks(
                                 name: 'Test Code Coverage',
                                 title: 'Code Coverage Check Success!',
