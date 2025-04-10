@@ -125,73 +125,70 @@ pipeline {
             }
         }
         
-        stage('Test') {
+        stage('Add JaCoCo Plugin') {
             steps {
                 script {
-                    def modules = env.CHANGED_SERVICES ? env.CHANGED_SERVICES.split(',') : []
+                    def changedServicesList = env.CHANGED_SERVICES ? env.CHANGED_SERVICES.split(',') : []
+                    
+                    // Nếu không có service nào thay đổi, sử dụng danh sách service mặc định
+                    if (changedServicesList.isEmpty()) {
+                        echo "No services changed. Adding JaCoCo plugin to default services."
+                        changedServicesList = ['spring-petclinic-customers-service', 'spring-petclinic-vets-service']
+                    }
 
-                    for (module in modules) {
-                        def testCommand = "mvn test -pl ${module}"
-                        echo "Running tests for affected modules: ${module}"
-                        sh "${testCommand}"
-
-                        // Generate JaCoCo HTML Report
-                        jacoco(
-                            classPattern: "**/${module}/target/classes",
-                            execPattern: "**/${module}/target/coverage-reports/jacoco.exec",
-                            sourcePattern: "**/${module}/src/main/java",
-                            runAlways: true
-                        )
-
-                        // Publish HTML Artifact of Code Coverage Report
-                        publishHTML(
-                            target: [
-                                allowMissing: false,
-                                alwaysLinkToLastBuild: true,
-                                keepAll: true,
-                                reportDir: "${module}/target/site/jacoco",
-                                reportFiles: "index.html",
-                                reportName: "${module}_code_coverage_report_${env.COMMIT_HASH}_${env.BUILD_ID}"
-                            ]
-                        )
-
-                        // Get Code Coverage
-                        def codeCoverages = []
-                        def coverageReport = readFile(file: "${WORKSPACE}/${module}/target/site/jacoco/index.html")
-                        def matcher = coverageReport =~ /<tfoot>(.*?)<\/tfoot>/
-                        if (matcher.find()) {
-                            def coverage = matcher[0][1]
-                            def instructionMatcher = coverage =~ /<td class="ctr2">(.*?)<\/td>/
-                            if (instructionMatcher.find()) {
-                                def coveragePercentage = instructionMatcher[0][1]
-                                echo "Overall code coverage of ${module}: ${coveragePercentage}%"
-
-                                codeCoverages.add(coveragePercentage)
-                            }
-                        }
-
-                        env.CODE_COVERAGES = codeCoverages.join(',')
-
-                        // Cập nhật GitHub Checks bằng publishChecks
-                        if (coveragePercentage.toFloat() >= 70) {
-                            publishChecks(
-                                name: 'Test Code Coverage',
-                                title: 'Code Coverage Check Success!',
-                                summary: 'All test code coverage is greater than 70%',
-                                text: 'Check Success!',
-                                detailsURL: env.BUILD_URL,
-                                conclusion: 'SUCCESS'
-                            )
-                        } else {
-                            publishChecks(
-                                name: 'Test Code Coverage',
-                                title: 'Code Coverage Check Failed!',
-                                summary: "Coverage must be at least 70%. Your coverage is ${coveragePercentage}%.",
-                                text: 'Increase test coverage and retry the build.',
-                                detailsURL: env.BUILD_URL,
-                                conclusion: 'FAILURE'
-                            )
-                            error "Code coverage check failed for ${module}. Coverage must be at least 70%."
+                    for (service in changedServicesList) {
+                        dir(service) {
+                            echo "Adding JaCoCo plugin to ${service}..."
+                            
+                            sh '''
+                                if ! grep -q "<build>" pom.xml; then
+                                    # Thêm thẻ <build> nếu chưa tồn tại
+                                    sed -i '/<\\/dependencies>/a\\
+                                    <build>\\
+                                        <plugins>\\
+                                            <plugin>\\
+                                                <groupId>org.jacoco</groupId>\\
+                                                <artifactId>jacoco-maven-plugin</artifactId>\\
+                                                <version>0.8.7</version>\\
+                                                <executions>\\
+                                                    <execution>\\
+                                                        <goals>\\
+                                                            <goal>prepare-agent</goal>\\
+                                                        </goals>\\
+                                                    </execution>\\
+                                                    <execution>\\
+                                                        <id>report</id>\\
+                                                        <phase>prepare-package</phase>\\
+                                                        <goals>\\
+                                                            <goal>report</goal>\\
+                                                        </goals>\\
+                                                    </execution>\\
+                                                    <execution>\\
+                                                        <id>jacoco-check</id>\\
+                                                        <goals>\\
+                                                            <goal>check</goal>\\
+                                                        </goals>\\
+                                                        <configuration>\\
+                                                            <rules>\\
+                                                                <rule>\\
+                                                                    <element>BUNDLE</element>\\
+                                                                    <limits>\\
+                                                                        <limit>\\
+                                                                            <counter>INSTRUCTION</counter>\\
+                                                                            <value>COVEREDRATIO</value>\\
+                                                                            <minimum>0.70</minimum>\\
+                                                                        </limit>\\
+                                                                    </limits>\\
+                                                                </rule>\\
+                                                            </rules>\\
+                                                        </configuration>\\
+                                                    </execution>\\
+                                                </executions>\\
+                                            </plugin>\\
+                                        </plugins>\\
+                                    </build>' pom.xml
+                                fi
+                            '''
                         }
                     }
                 }
