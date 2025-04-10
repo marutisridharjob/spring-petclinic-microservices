@@ -128,27 +128,14 @@ pipeline {
                             echo "Testing ${service}..."
                             // Chỉ chạy test và sử dụng JaCoCo sau khi đã thêm plugin
                             sh "mvn test"
-                        }
-                    }
-                }
-            }
-            post {
-                always {
-                    script {
-                        def changedServicesList = env.CHANGED_SERVICES.split(',')
-                        for (service in changedServicesList) {
-                            dir(service) {
-                                // Collect JUnit test results
-                                junit 'target/surefire-reports/*.xml'
-                                
-                                // Collect JaCoCo coverage results (nếu tệp tồn tại)
-                                jacoco(
-                                    execPattern: 'target/jacoco.exec',
-                                    classPattern: 'target/classes',
-                                    sourcePattern: 'src/main/java',
-                                    exclusionPattern: 'src/test*'
-                                )
-                            }
+                            
+                            // Generate JaCoCo HTML Report
+                            jacoco(
+                                classPattern: "**/${service}/target/classes",
+                                execPattern: "**/${service}/target/jacoco.exec",
+                                sourcePattern: "**/${service}/src/main/java",
+                                runAlways: true
+                            )
                         }
                     }
                 }
