@@ -127,7 +127,7 @@ pipeline {
                         dir(service) {
                             echo "Testing ${service}..."
                             // Chỉ chạy test và sử dụng JaCoCo sau khi đã thêm plugin
-                            sh "mvn -B test"
+                            sh "mvn test"
                         }
                     }
                 }
