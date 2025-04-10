@@ -16,7 +16,12 @@ def detectChanges() {
 
     // Danh sách các thư mục service
     def folderList = [
+        'spring-petclinic-admin-server',
+        'spring-petclinic-api-gateway',
+        'spring-petclinic-config-server',
         'spring-petclinic-customers-service',
+        'spring-petclinic-discovery-server',
+        'spring-petclinic-genai-service',
         'spring-petclinic-vets-service',
         'spring-petclinic-visits-service'
     ]
@@ -29,7 +34,13 @@ def detectChanges() {
 
     echo "Changed Folders:\n${changedFolders.join('\n')}"
 
-    // Trả về danh sách các service có thay đổi
+    // Nếu không có thay đổi, trả về hai service mặc định
+    if (changedFolders.isEmpty()) {
+        echo "No changes detected. Using default services."
+        changedFolders = ['spring-petclinic-customers-service', 'spring-petclinic-vets-service']
+    }
+
+    // Trả về danh sách các service có thay đổi hoặc mặc định
     return changedFolders
 }
 
