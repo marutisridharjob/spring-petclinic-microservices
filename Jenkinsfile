@@ -55,6 +55,7 @@ pipeline {
                     def parallelTests = [:]
 
                     services.each { service ->
+                    
                         parallelTests[service] = {
                             stage("Test: ${service}") {
                                 try {
@@ -62,9 +63,12 @@ pipeline {
                                     sh "mvn jacoco:report -pl ${service}"
 
                                     def reportPath = "${service}/target/site/jacoco/index.html"
+                                    def resultPath = "${service}/target/surefire-reports/*.txt"
+
                                     def coverage = 0
 
                                     if (fileExists(reportPath)) {
+                                        archiveArtifacts artifacts: resultPath, fingerprint: true
                                         archiveArtifacts artifacts: reportPath, fingerprint: true
 
                                         coverage = sh(
@@ -87,7 +91,7 @@ pipeline {
                                     echo "📊 Code Coverage for ${service}: ${coverage}%"
                                     coverageResults << "${service}:${coverage}%"
 
-                                    if (coverage >= 0) {
+                                    if (coverage >= 70) {
                                         servicesToBuild << service
                                     }
                                 } catch (Exception e) {
@@ -123,6 +127,9 @@ pipeline {
                                 try {
                                     echo "🚀 Building: ${service}"
                                     sh "mvn clean package -pl ${service} -DfinalName=app -DskipTests"
+                                    
+                                    def jarfile = "${service}/target/app.jar"
+                                    archiveArtifacts artifacts: jarfile, fingerprint: true
                                 } catch (Exception e) {
                                     echo "❌ Build failed for ${service}: ${e.getMessage()}"
                                     error("Build failed for ${service}")
@@ -206,26 +213,40 @@ pipeline {
 
     post {
         always {
+            echo 'Cleaning up...'
             sh "docker logout ${REGISTRY_URL}"
         }
         success {
-            echo "CI pipeline run successfully!"
+            publishChecks(
+                name: 'PipelineResult',
+                title: 'Code Coverage Check Success',
+                status: 'COMPLETED',
+                conclusion: 'SUCCESS',
+                summary: 'Pipeline completed successfully.',
+                detailsURL: env.BUILD_URL
+            )
         }
+
         failure {
-            echo "Build or push failed. Please check the logs."
+            publishChecks(
+                name: 'PipelineResult',
+                title: 'Code Coverage Check Fail',
+                status: 'COMPLETED',
+                conclusion: 'FAILURE', 
+                summary: 'Pipeline failed. Check logs for details.',
+                detailsURL: env.BUILD_URL
+            )
         }
     }
+
 }
 
 def getChangedServices() {
 
-    def changedFiles = sh(script: 'git diff --name-only origin/main~1 origin/main', returnStdout: true).trim().split("\n")
+    def changedFiles = sh(script: "git diff --name-only origin/${env.BRANCH_NAME}~1 origin/${env.BRANCH_NAME}", returnStdout: true).trim().split("\n")
+
     def services = [
-        'spring-petclinic-admin-server', 
-        'spring-petclinic-config-server',
         'spring-petclinic-customers-service', 
-        'spring-petclinic-discovery-server',
-        'spring-petclinic-genai-service',
         'spring-petclinic-vets-service',
         'spring-petclinic-visits-service'
     ]
@@ -237,6 +258,7 @@ def getChangedServices() {
     if (affectedServices.isEmpty()) {
         return "NONE"
     }
+
     echo "Changed services: ${affectedServices.join(', ')}"
     return affectedServices.join(',')
 }
