@@ -73,84 +73,85 @@ class VetResourceTest {
         vet.setId(1);
 
         given(vetRepository.findAll()).willReturn(asList(vet));
+
         mvc.perform(get("/vets").accept(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].id").value(1));
-}
-@Test
-void testGetterAndSetter() {
-    Vet vet = new Vet();
-    vet.setId(1);
-    vet.setFirstName("John");
-    vet.setLastName("Doe");
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(1));
+    }
+    @Test
+    void testGetterAndSetter() {
+        Vet vet = new Vet();
+        vet.setId(1);
+        vet.setFirstName("John");
+        vet.setLastName("Doe");
 
-    assertEquals(1, vet.getId());
-    assertEquals("John", vet.getFirstName());
-    assertEquals("Doe", vet.getLastName());
-}
+        assertEquals(1, vet.getId());
+        assertEquals("John", vet.getFirstName());
+        assertEquals("Doe", vet.getLastName());
+    }
 
-@Test
-void shouldAddSpecialty() {
-    Vet vet = new Vet();
-    Specialty specialty = new Specialty();
-    specialty.setName("Surgery");
+    @Test
+    void shouldAddSpecialty() {
+        Vet vet = new Vet();
+        Specialty specialty = new Specialty();
+        specialty.setName("Surgery");
 
-    vet.addSpecialty(specialty);
+        vet.addSpecialty(specialty);
 
-    assertEquals(1, vet.getNrOfSpecialties());
-    assertTrue(vet.getSpecialties().contains(specialty));
-}
+        assertEquals(1, vet.getNrOfSpecialties());
+        assertTrue(vet.getSpecialties().contains(specialty));
+    }
 
-@Test
-void shouldReturnSpecialtiesSortedByName() {
-    Vet vet = new Vet();
-    Specialty s1 = new Specialty();
-    s1.setName("Dentistry");
-    Specialty s2 = new Specialty();
-    s2.setName("Anesthesia");
+    @Test
+    void shouldReturnSpecialtiesSortedByName() {
+        Vet vet = new Vet();
+        Specialty s1 = new Specialty();
+        s1.setName("Dentistry");
+        Specialty s2 = new Specialty();
+        s2.setName("Anesthesia");
 
-    vet.addSpecialty(s1);
-    vet.addSpecialty(s2);
+        vet.addSpecialty(s1);
+        vet.addSpecialty(s2);
 
-    List<Specialty> sorted = vet.getSpecialties();
-    assertEquals("Anesthesia", sorted.get(0).getName());  // Đầu tiên phải là "Anesthesia" (A < D)
-    assertEquals("Dentistry", sorted.get(1).getName());
-}
+        List<Specialty> sorted = vet.getSpecialties();
+        assertEquals("Anesthesia", sorted.get(0).getName());  // Đầu tiên phải là "Anesthesia" (A < D)
+        assertEquals("Dentistry", sorted.get(1).getName());
+    }
 
-@Test
-void shouldHandleEmptySpecialties() {
-    Vet vet = new Vet();
-    assertEquals(0, vet.getNrOfSpecialties());
-    assertTrue(vet.getSpecialties().isEmpty());
-}
+    @Test
+    void shouldHandleEmptySpecialties() {
+        Vet vet = new Vet();
+        assertEquals(0, vet.getNrOfSpecialties());
+        assertTrue(vet.getSpecialties().isEmpty());
+    }
 
-@Test
-void shouldFailValidationWhenFirstNameIsBlank() {
-    Vet vet = new Vet();
-    vet.setFirstName("");  // Vi phạm @NotBlank
-    vet.setLastName("Doe");
+    @Test
+    void shouldFailValidationWhenFirstNameIsBlank() {
+        Vet vet = new Vet();
+        vet.setFirstName("");  // Vi phạm @NotBlank
+        vet.setLastName("Doe");
 
-    Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-    Set<ConstraintViolation<Vet>> violations = validator.validate(vet);
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        Set<ConstraintViolation<Vet>> violations = validator.validate(vet);
 
-    assertEquals(1, violations.size());
-    assertEquals("must not be blank", violations.iterator().next().getMessage());
-}
+        assertEquals(1, violations.size());
+        assertEquals("must not be blank", violations.iterator().next().getMessage());
+    }
 
-@Test
-void shouldThrowExceptionWhenAddingNullSpecialty() {
-    Vet vet = new Vet();
-    assertThrows(IllegalArgumentException.class, () -> vet.addSpecialty(null));
-}
+    @Test
+    void shouldThrowExceptionWhenAddingNullSpecialty() {
+        Vet vet = new Vet();
+        assertThrows(IllegalArgumentException.class, () -> vet.addSpecialty(null));
+    }
+    
+    @Test
+    void shouldNotAddDuplicateSpecialties() {
+        Vet vet = new Vet();
+        Specialty s1 = new Specialty();
+        s1.setName("Surgery");
+        vet.addSpecialty(s1);
+        vet.addSpecialty(s1);  // Thêm cùng specialty 2 lần
 
-@Test
-void shouldNotAddDuplicateSpecialties() {
-    Vet vet = new Vet();
-    Specialty s1 = new Specialty();
-    s1.setName("Surgery");
-    vet.addSpecialty(s1);
-    vet.addSpecialty(s1);  // Thêm cùng specialty 2 lần
-
-    assertEquals(1, vet.getNrOfSpecialties());  // Chỉ giữ lại 1
-}
+        assertEquals(1, vet.getNrOfSpecialties());  // Chỉ giữ lại 1
+    }
 }
