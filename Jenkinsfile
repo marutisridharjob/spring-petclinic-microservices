@@ -3,7 +3,7 @@ pipeline {
     
     tools {
         maven 'M3' // Cần cấu hình Maven trong Global Tool Configuration
-        jdk 'jdk11' // Cần cấu hình JDK trong Global Tool Configuration
+        jdk 'jdk17' // Cần cấu hình JDK trong Global Tool Configuration
     }
     
     stages {
@@ -90,13 +90,13 @@ def getChangedServices(String changes) {
     }
     
     def serviceMap = [
-        'spring-petclinic-api-gateway': 'api-gateway',
-        'spring-petclinic-customers-service': 'customers-service',
-        'spring-petclinic-vets-service': 'vets-service',
-        'spring-petclinic-visits-service': 'visits-service',
-        'spring-petclinic-config-server': 'config-server',
-        'spring-petclinic-discovery-server': 'discovery-server',
-        'spring-petclinic-admin-server': 'admin-server'
+        // 'spring-petclinic-api-gateway': 'api-gateway',
+        // 'spring-petclinic-customers-service': 'customers-service',
+        // 'spring-petclinic-vets-service': 'vets-service',
+        // 'spring-petclinic-visits-service': 'visits-service',
+        // 'spring-petclinic-config-server': 'config-server',
+        // 'spring-petclinic-discovery-server': 'discovery-server',
+        // 'spring-petclinic-admin-server': 'admin-server'
     ]
     
     def changedServices = []
