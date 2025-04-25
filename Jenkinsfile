@@ -91,9 +91,12 @@ pipeline {
                                     echo "📊 Code Coverage for ${service}: ${coverage}%"
                                     coverageResults << "${service}:${coverage}%"
 
-                                    if (coverage >= 70) {
+                                    if (coverage < 70) {
+                                        error "❌ ${service} has insufficient test coverage: ${coverage}%. Minimum required is 70%."
+                                    } else {
                                         servicesToBuild << service
                                     }
+                                    
                                 } catch (Exception e) {
                                     echo "❌ Error while testing ${service}: ${e.getMessage()}"
                                 }
