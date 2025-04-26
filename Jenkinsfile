@@ -264,10 +264,9 @@ pipeline {
                 expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
             }
             steps {
-                def services = env.SERVICES_TO_BUILD.split(',')
-
                 dir('Petclinic_Manifest') {
                     script {
+                        def services = env.SERVICES_TO_BUILD.split(',')
                         def commitMessages = []
 
                         services.each { service ->
