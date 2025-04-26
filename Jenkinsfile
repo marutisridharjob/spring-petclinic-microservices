@@ -275,7 +275,7 @@ pipeline {
 
                             sh """
                                 echo ${service.drop(15)}
-                                sed -i 's|image:.*|image: ${DOCKER_IMAGE_BASENAME}/${service}:${GIT_TAG}|' dev/${service.drop(16)}/deployment.yml
+                                sed -i 's|image:.*|image: ${DOCKER_IMAGE_BASENAME}/${service}:${GIT_TAG}|' dev/${service.drop(17)}/deployment.yml
                             """
                         }
 
