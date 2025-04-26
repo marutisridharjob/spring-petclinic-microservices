@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         CHANGED_SERVICES = getChangedServices()
-        REGISTRY_URL = "harbor.lptdevops.website"
-        DOCKER_IMAGE_BASENAME = "harbor.lptdevops.website/petclinic"
+        REGISTRY_URL = "docker.io"
+        DOCKER_IMAGE_BASENAME = "thuanlp"
     }
 
     stages {
@@ -14,14 +14,13 @@ pipeline {
 
                 script {
                     try {
-                        
-                        def gitTag = sh(script: "git describe --tags --always", returnStdout: true).trim()
-                        env.GIT_TAG = gitTag.split("-")[0]
+                        def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                        env.GIT_TAG = commitId
 
-                        echo "Git Tag or Commit: ${env.GIT_TAG}"
+                        echo "Commit ID: ${env.GIT_TAG}"
                     } catch (Exception e) {
-                        echo "Failed to retrieve Git tag: ${e.getMessage()}"
-                        env.GIT_TAG = "1.0"
+                        echo "Failed to retrieve Commit ID: ${e.getMessage()}"
+                        env.GIT_TAG = "latest"
                     }
                 }
             }
@@ -90,7 +89,7 @@ pipeline {
 
                                     echo "📊 Code Coverage for ${service}: ${coverage}%"
                                     coverageResults << "${service}:${coverage}%"
-                       
+
                                     if (coverage < 70) {
                                         error "❌ ${service} has insufficient test coverage: ${coverage}%. Minimum required is 70%."
                                     } else {
@@ -178,7 +177,7 @@ pipeline {
         stage('Login to Docker Registry') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'harbor', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh "echo $DOCKER_PASS | docker login ${REGISTRY_URL} -u $DOCKER_USER --password-stdin"
                     }
                 }
