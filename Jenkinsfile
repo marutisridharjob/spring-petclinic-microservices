@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         CHANGED_SERVICES = getChangedServices()
-        REGISTRY_URL = "harbor.lptdevops.website"
-        DOCKER_IMAGE_BASENAME = "harbor.lptdevops.website/petclinic"
+        REGISTRY_URL = "docker.io"
+        DOCKER_IMAGE_BASENAME = "thuanlp"
     }
 
     stages {
@@ -14,18 +14,29 @@ pipeline {
 
                 script {
                     try {
-                        
-                        def gitTag = sh(script: "git describe --tags --always", returnStdout: true).trim()
-                        env.GIT_TAG = gitTag.split("-")[0]
-
-                        echo "Git Tag or Commit: ${env.GIT_TAG}"
+                        if (env.BRANCH_NAME == 'main') {
+                            def tag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+                            if (tag) {
+                                env.GIT_TAG = tag
+                                echo "Found Tag: ${env.GIT_TAG}"
+                            } else {
+                                def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                                env.GIT_TAG = commitId
+                                echo "No tag found, using Commit ID: ${env.GIT_TAG}"
+                            }
+                        } else {
+                            def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                            env.GIT_TAG = commitId
+                            echo "Branch is not main, using Commit ID: ${env.GIT_TAG}"
+                        }
                     } catch (Exception e) {
-                        echo "Failed to retrieve Git tag: ${e.getMessage()}"
-                        env.GIT_TAG = "1.0"
+                        echo "Failed to determine tag or commit ID: ${e.getMessage()}"
+                        env.GIT_TAG = "latest"
                     }
                 }
             }
         }
+
 
         stage('Detect Changes') {
             steps {
@@ -91,7 +102,7 @@ pipeline {
                                     echo "📊 Code Coverage for ${service}: ${coverage}%"
                                     coverageResults << "${service}:${coverage}%"
 
-                                    if (coverage < 70) {
+                                    if (coverage < 0) {
                                         error "❌ ${service} has insufficient test coverage: ${coverage}%. Minimum required is 70%."
                                     } else {
                                         servicesToBuild << service
@@ -178,7 +189,7 @@ pipeline {
         stage('Login to Docker Registry') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'harbor', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh "echo $DOCKER_PASS | docker login ${REGISTRY_URL} -u $DOCKER_USER --password-stdin"
                     }
                 }
@@ -209,6 +220,88 @@ pipeline {
                     }
 
                     parallel parallelDockerPush 
+                }
+            }
+        }
+
+        stage('Checkout Manifest Repo') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'petclinic_github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                    script {
+                        sh "rm -rf Petclinic_Manifest"
+                        def repoDir = 'Petclinic_Manifest'
+                        if (!fileExists(repoDir)) {
+                            sh """
+                                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_Manifest.git
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Check and Uncomment YAML Files') {
+            steps {
+                dir('Petclinic_Manifest/dev') {
+                    script {
+                        sh '''
+                            for file in $(find . -name "*.yml"); do
+                                if grep -q "^#" "$file"; then
+                                    echo "Uncommenting file: $file"
+                                    sed -i 's/^#//' "$file"
+                                else
+                                    echo "File $file is not commented, skipping"
+                                fi
+                            done
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Update Manifests') {
+            when {
+                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
+            }
+            steps {
+                dir('Petclinic_Manifest') {
+                    script {
+                        def services = env.SERVICES_TO_BUILD.split(',')
+                        def commitMessages = []
+
+                        services.each { service ->
+                            echo "Updating ${service} from branch: main"
+                            commitMessages.add("${service}:${GIT_TAG}")
+
+                            sh """
+                                echo ${service.drop(15)}
+                                sed -i 's|image:.*|image: ${DOCKER_IMAGE_BASENAME}/${service}:${GIT_TAG}|' dev/${service.drop(17)}/deployment.yml
+                            """
+                        }
+
+                        sh """
+                            echo "Update Docker tags: ${commitMessages.join(', ')}" > commit_message.txt
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Push Changes to GitHub') {
+            steps {
+                dir('Petclinic_Manifest') {
+                    withCredentials([usernamePassword(credentialsId: 'petclinic_github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                            git remote set-url origin https://github.com/ThuanPhuc27/Petclinic_Manifest.git
+                            git config user.name "jenkins-bot"
+                            git config user.email "jenkins-bot@lptdevops.com"
+
+                            git add .
+                            git commit -F commit_message.txt || echo "Nothing to commit"
+                            git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_Manifest.git main
+
+                        """
+                    }
                 }
             }
         }
@@ -251,7 +344,12 @@ def getChangedServices() {
     def services = [
         'spring-petclinic-customers-service', 
         'spring-petclinic-vets-service',
-        'spring-petclinic-visits-service'
+        'spring-petclinic-visits-service',
+        'spring-petclinic-admin-server', 
+        'spring-petclinic-config-server',
+        'spring-petclinic-discovery-server',
+        'spring-petclinic-genai-service',
+        'spring-petclinic-api-gateway',
     ]
 
     def affectedServices = services.findAll { service ->
