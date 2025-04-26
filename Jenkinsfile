@@ -270,10 +270,12 @@ pipeline {
                         def commitMessages = []
 
                         services.each { service ->
-                            echo "Updating ${service.name} from branch: main"
+                            echo "Updating ${service} from branch: main"
+                            commitMessages.add("${service}:${GIT_TAG}")
 
                             sh """
-                                sed -i 's|image:.*|image: ${DOCKER_IMAGE_BASENAME}/${service}:${GIT_TAG}|' dev/${service..drop(15)}/deployment.yml
+                                echo ${service.drop(15)}
+                                sed -i 's|image:.*|image: ${DOCKER_IMAGE_BASENAME}/${service}:${GIT_TAG}|' dev/${service.drop(16)}/deployment.yml
                             """
                         }
 
