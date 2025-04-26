@@ -343,7 +343,7 @@ def getChangedServices() {
     def services = [
         'spring-petclinic-customers-service', 
         'spring-petclinic-vets-service',
-        'spring-petclinic-visits-service'
+        'spring-petclinic-visits-service',
         'spring-petclinic-admin-server', 
         'spring-petclinic-config-server',
         'spring-petclinic-discovery-server',
