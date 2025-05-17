@@ -1,6 +1,7 @@
 pipeline {
     agent any
 
+    
     options {
         buildDiscarder(logRotator(
             numToKeepStr: '10',      // Giữ logs của 10 builds
