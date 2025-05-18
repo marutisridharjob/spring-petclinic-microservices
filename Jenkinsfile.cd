@@ -124,13 +124,12 @@ pipeline {
                         def manifestFile = "k8s/${serviceKey}.yaml" // Đường dẫn tới file manifest
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
-                            // Sử dụng DOCKER_HUB_USERNAME và imageTag để thay thế placeholder trong manifest
-                            // Giả sử manifest của bạn có placeholder là \${DOCKER_HUB_USERNAME} và \${TAG}
+                            // Sử dụng cú pháp sed cải tiến với -e và dấu phân cách ~
                             sh """
-                            cat ${manifestFile} | \\
-                            sed 's|\\\${DOCKER_HUB_USERNAME}|${env.DOCKER_HUB_USERNAME}|g' | \\
-                            sed 's|\\\${TAG}|${imageTag}|g' | \\
-                            sed 's|namespace: petclinic|namespace: ${params.TARGET_NAMESPACE}|g' | \\
+                            cat ${manifestFile} | \
+                            sed -e "s~\\\${DOCKER_HUB_USERNAME}~${env.DOCKER_HUB_USERNAME}~g" \
+                                -e "s~\\\${TAG}~${imageTag}~g" \
+                                -e "s~namespace: petclinic~namespace: ${params.TARGET_NAMESPACE}~g" | \
                             kubectl apply -n ${params.TARGET_NAMESPACE} -f -
                             """
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
@@ -148,9 +147,10 @@ pipeline {
                     // Deploy NodePort service cho API Gateway
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
+                        // Cũng áp dụng cú pháp sed cải tiến cho NodePort service
                         sh """
-                        cat ${apiGatewayNodePortManifest} | \\
-                        sed 's|namespace: petclinic|namespace: ${params.TARGET_NAMESPACE}|g' | \\
+                        cat ${apiGatewayNodePortManifest} | \
+                        sed -e "s~namespace: petclinic~namespace: ${params.TARGET_NAMESPACE}~g" | \
                         kubectl apply -n ${params.TARGET_NAMESPACE} -f -
                         """
                     } else {
