@@ -112,9 +112,7 @@ pipeline {
                             def groovyTargetNamespace = params.TARGET_NAMESPACE 
 
                             sh $/                            
-                                set -x 
-                                # Export các biến Groovy thành biến môi trường shell 
-                                export SED_DOCKER_HUB_USERNAME="${groovyDockerHubUsername}" 
+                                set -x                                export SED_DOCKER_HUB_USERNAME="${groovyDockerHubUsername}" 
                                 export SED_IMAGE_TAG="${groovyImageTag}" 
                                 export SED_TARGET_NAMESPACE="${groovyTargetNamespace}" 
 
