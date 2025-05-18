@@ -1,3 +1,5 @@
+import java.util.regex.Pattern
+
 pipeline {
     agent any
     
@@ -68,7 +70,6 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    import java.util.regex.Pattern 
 
                     sh "kubectl create namespace \"${params.TARGET_NAMESPACE}\" --dry-run=client -o yaml | kubectl apply -f -"
                     
