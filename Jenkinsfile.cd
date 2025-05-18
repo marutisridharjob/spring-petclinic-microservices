@@ -1,4 +1,4 @@
-import java.util.regex.Pattern // Giữ lại, không hại gì
+import java.util.regex.Pattern
 
 pipeline {
     agent any
@@ -16,8 +16,7 @@ pipeline {
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub')
-        // KHAI BÁO LẠI DOCKER_HUB_USERNAME Ở ĐÂY
-        // Hoặc chúng ta sẽ truy cập DOCKER_HUB_CREDS_USR trực tiếp trong script block nếu cần
+        // DOCKER_HUB_CREDS_USR sẽ được truy cập trực tiếp
     }
     
     stages {
@@ -33,8 +32,6 @@ pipeline {
         stage('Prepare Image Tags') {
             steps {
                 script {
-                    def localTagMapForInfo = [:] 
-
                     def servicesParams = [
                         'api-gateway'     : params.API_GATEWAY_BRANCH,
                         'admin-server'    : params.ADMIN_SERVER_BRANCH,
@@ -63,7 +60,6 @@ pipeline {
                                 imageTag = 'latest'
                             }
                         }
-                        localTagMapForInfo[serviceName] = imageTag
                         env["TAG_${serviceName.toUpperCase().replace('-', '_')}"] = imageTag
                         echo "Stored image tag for ${serviceName} in env.TAG_${serviceName.toUpperCase().replace('-', '_')}: ${imageTag}"
                     }
@@ -94,32 +90,20 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
                             
-                            // SỬ DỤNG DOCKER_HUB_CREDS_USR TRỰC TIẾP TỪ CREDENTIALS
-                            // KHÔNG CẦN KHAI BÁO LẠI DOCKER_HUB_USERNAME TRONG environment {}
-                            def shellDockerHubUsername = DOCKER_HUB_CREDS_USR 
-                            def shellImageTag = currentImageTag 
-                            def shellTargetNamespace = params.TARGET_NAMESPACE 
-
-                            sh """
-                                set -x
-                                export SED_DOCKER_HUB_USERNAME_EXPORTED="${shellDockerHubUsername}"
-                                export SED_IMAGE_TAG_EXPORTED="${shellImageTag}"
-                                export SED_TARGET_NAMESPACE_EXPORTED="${shellTargetNamespace}"
-
-                                cat "${manifestFile}" | \\
-                                sed \\
-                                    -e 's~\\\$\\\\{\\s*DOCKER_HUB_USERNAME\\s*\\}~'"\$SED_DOCKER_HUB_USERNAME_EXPORTED"'~g' \\
-                                    -e 's~\\\$\\\\{\\s*TAG\\s*\\}~'"\$SED_IMAGE_TAG_EXPORTED"'~g' \\
-                                    -e 's~namespace:\\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE_EXPORTED"'~g' \\
-                                    > manifest_temp.yaml
-                                
-                                echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
-                                cat manifest_temp.yaml
-                                echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
-                                
-                                kubectl apply -n "\$SED_TARGET_NAMESPACE_EXPORTED" -f manifest_temp.yaml
-                                set +x
-                            """
+                            String originalContent = readFile(file: manifestFile, encoding: 'UTF-8')
+                            String processedContent = originalContent
+                                .replace('${DOCKER_HUB_USERNAME}', DOCKER_HUB_CREDS_USR) // Truy cập trực tiếp biến từ credentials
+                                .replace('${TAG}', currentImageTag)
+                                .replace('namespace: petclinic', "namespace: ${params.TARGET_NAMESPACE}")
+                            
+                            // Ghi nội dung đã xử lý vào file tạm
+                            writeFile(file: 'manifest_temp.yaml', text: processedContent, encoding: 'UTF-8')
+                            
+                            echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
+                            sh "cat manifest_temp.yaml" // Vẫn dùng sh để cat cho dễ xem trong log
+                            echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
+                            
+                            sh "kubectl apply -n \"${params.TARGET_NAMESPACE}\" -f manifest_temp.yaml"
                             
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
                                 echo "Waiting for ${serviceKey} to stabilize..."
@@ -134,17 +118,13 @@ pipeline {
                     
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
-                        def shellTargetNamespaceForNodePort = params.TARGET_NAMESPACE
-                        sh """
-                            set -x
-                            export SED_TARGET_NAMESPACE_NODEPORT_EXPORTED="${shellTargetNamespaceForNodePort}"
-                            cat "${apiGatewayNodePortManifest}" | \\
-                            sed -e 's~namespace:\\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED"'~g' \\
-                                > nodeport_temp.yaml
-                            
-                            kubectl apply -n "\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED" -f nodeport_temp.yaml
-                            set +x
-                        """
+                        String originalNodePortContent = readFile(file: apiGatewayNodePortManifest, encoding: 'UTF-8')
+                        String processedNodePortContent = originalNodePortContent
+                                .replace('namespace: petclinic', "namespace: ${params.TARGET_NAMESPACE}")
+
+                        writeFile(file: 'nodeport_temp.yaml', text: processedNodePortContent, encoding: 'UTF-8')
+                        
+                        sh "kubectl apply -n \"${params.TARGET_NAMESPACE}\" -f nodeport_temp.yaml"
                     } else {
                         echo "Warning: API Gateway NodePort manifest ${apiGatewayNodePortManifest} not found."
                     }
@@ -158,7 +138,10 @@ pipeline {
                         echo "====================================================="
                         echo "Ứng dụng Petclinic đã được triển khai vào namespace: ${params.TARGET_NAMESPACE}"
                         echo "Bạn có thể truy cập ứng dụng tại: http://${workerNodeIP}:${nodePort}"
-                        // ... (phần echo thông tin hosts)
+                        echo "Nếu truy cập từ máy local, hãy thêm dòng sau vào file /etc/hosts (hoặc C:\\Windows\\System32\\drivers\\etc\\hosts trên Windows):"
+                        echo "${workerNodeIP} petclinic-${params.TARGET_NAMESPACE}.local"
+                        echo "Sau đó, bạn có thể truy cập ứng dụng tại: http://petclinic-${params.TARGET_NAMESPACE}.local:${nodePort}"
+                        echo "====================================================="
                     }
                 }
             }
