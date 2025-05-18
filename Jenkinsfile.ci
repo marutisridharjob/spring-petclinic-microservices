@@ -7,7 +7,7 @@ pipeline {
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub')
-        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}"
+        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}" // Using Groovy GString for consistency
         COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
     
@@ -16,7 +16,7 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM', 
                     branches: [[name: "${params.BRANCH_NAME}"]], 
-                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02.git']] // Corrected your username
+                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02.git']]
                 ])
             }
         }
@@ -25,13 +25,13 @@ pipeline {
             steps {
                 sh './mvnw clean package -DskipTests'
                 
-                // --- DEBUGGING ADDED HERE ---
+                // --- DEBUGGING - You can remove or comment this out after it works ---
                 sh 'echo "--- Listing workspace root after Maven build ---"'
                 sh 'ls -l'
-                sh 'echo "--- Listing admin-server directory after Maven build ---"'
-                sh 'ls -l admin-server'
-                sh 'echo "--- Listing admin-server/target directory after Maven build (if it exists) ---"'
-                sh 'ls -lR admin-server/target || echo "admin-server/target not found or empty after build stage"'
+                sh 'echo "--- Listing spring-petclinic-admin-server directory after Maven build ---"'
+                sh 'ls -l spring-petclinic-admin-server' // Corrected name
+                sh 'echo "--- Listing spring-petclinic-admin-server/target directory after Maven build (if it exists) ---"'
+                sh 'ls -lR spring-petclinic-admin-server/target || echo "spring-petclinic-admin-server/target not found or empty after build stage"'
                 // --- END DEBUGGING --- 
             }
         }
@@ -39,31 +39,45 @@ pipeline {
         stage('Build and Push Docker Images') {
             steps {
                 script {
-                    def services = ['admin-server', 'api-gateway', 'customers-service', 'discovery-server', 'vets-service', 'visits-service', 'genai-service']
+                    // CORRECTED SERVICE NAMES HERE
+                    def services = [
+                        'spring-petclinic-admin-server', 
+                        'spring-petclinic-api-gateway', 
+                        'spring-petclinic-customers-service', 
+                        'spring-petclinic-discovery-server', 
+                        'spring-petclinic-vets-service', 
+                        'spring-petclinic-visits-service', 
+                        'spring-petclinic-genai-service'
+                        // Note: 'spring-petclinic-config-server' is also in your ls output. 
+                        // Add it here if you need to build a Docker image for it.
+                        // If not, it's fine to omit.
+                    ]
                     
-                    services.each { service ->
-                        dir(service) {
-                            echo "Current directory inside loop: ${pwd()} for service ${service}"
-                            echo "Listing contents of current dir (${service}) for target directory:"
-                            sh 'ls -la . || echo "Cannot list current directory."' // List current dir
-                            sh 'ls -la target || echo "Target directory does not exist here or is empty for ${service}."'
-
+                    services.each { serviceDirName -> // Renamed variable for clarity
+                        dir(serviceDirName) { // Use the full directory name
+                            echo "Current directory inside loop: ${pwd()} for service ${serviceDirName}"
+                            echo "Listing contents of current dir (${serviceDirName}) for target directory:"
+                            sh 'ls -la . || echo "Cannot list current directory."' 
+                            sh 'ls -la target || echo "Target directory does not exist here or is empty for ${serviceDirName}."'
 
                             def jarFile = sh(script: "find target -maxdepth 1 -name '*.jar' -print -quit", returnStdout: true).trim()
                             if (jarFile.isEmpty()) {
-                                error("No JAR file found in target/ for service ${service}. Current dir: ${pwd()}")
+                                error("No JAR file found in target/ for service ${serviceDirName}. Current dir: ${pwd()}")
                             }
                             
                             def artifactNameWithExt = jarFile.split('/').last()
                             def artifactName = artifactNameWithExt.take(artifactNameWithExt.lastIndexOf('.'))
 
+                            // Determine the base service name for the Docker image tag (e.g., admin-server from spring-petclinic-admin-server)
+                            def dockerImageServiceName = serviceDirName.replace('spring-petclinic-', '')
+
                             sh """ 
                             cp ../docker/Dockerfile .
-                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID} .
-                            docker tag \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID} \${DOCKER_HUB_USERNAME}/petclinic-\${service}:latest
-                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
-                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID}
-                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${service}:latest
+                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:\${COMMIT_ID} .
+                            docker tag \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:\${COMMIT_ID} \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:latest
+                            echo \${DOCKER_HUB_CREDS_ PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
+                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:\${COMMIT_ID}
+                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:latest
                             """
                         }
                     }
