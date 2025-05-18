@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     parameters {
-        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build' )
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build')
     }
     
     environment {
@@ -16,57 +16,59 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM', 
                     branches: [[name: "${params.BRANCH_NAME}"]], 
-                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02']]
-                ] )
+                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02.git']] // Corrected your username
+                ])
             }
         }
         
         stage('Build') {
             steps {
                 sh './mvnw clean package -DskipTests'
+                
+                // --- DEBUGGING ADDED HERE ---
+                sh 'echo "--- Listing workspace root after Maven build ---"'
+                sh 'ls -l'
+                sh 'echo "--- Listing admin-server directory after Maven build ---"'
+                sh 'ls -l admin-server'
+                sh 'echo "--- Listing admin-server/target directory after Maven build (if it exists) ---"'
+                sh 'ls -lR admin-server/target || echo "admin-server/target not found or empty after build stage"'
+                // --- END DEBUGGING --- 
             }
         }
         
-        stage('Build and Push Docker Images' ) { 
-            steps { 
-                script { 
-                    def services = ['admin-server', 'api-gateway', 'customers-service', 'discovery-server', 'vets-service', 'visits-service', 'genai-service' ] 
+        stage('Build and Push Docker Images') {
+            steps {
+                script {
+                    def services = ['admin-server', 'api-gateway', 'customers-service', 'discovery-server', 'vets-service', 'visits-service', 'genai-service']
                     
-                    services.each { service -> 
-                        dir(service) { // Jenkins is now in /var/lib/jenkins/workspace/petclinic-ci/<service-name> 
-                            echo "Current directory: ${pwd()}" // For debugging 
-                            echo "Listing contents of target directory if it exists:" 
-                            sh 'ls -R target || echo "Target directory does not exist here or is empty."' // For debugging 
-        
-                            // Find the generated JAR file. 
-                            // The 'target' directory should be directly accessible from here. 
-                            def jarFile = sh(script: "find target -maxdepth 1 -name '*.jar' -print -quit", returnStdout: true ).trim() 
-                            if  (jarFile.isEmpty()) { 
-                                error("No JAR file found in target/ for service ${service}. Current dir: ${pwd()}" ) 
-                            } 
+                    services.each { service ->
+                        dir(service) {
+                            echo "Current directory inside loop: ${pwd()} for service ${service}"
+                            echo "Listing contents of current dir (${service}) for target directory:"
+                            sh 'ls -la . || echo "Cannot list current directory."' // List current dir
+                            sh 'ls -la target || echo "Target directory does not exist here or is empty for ${service}."'
+
+
+                            def jarFile = sh(script: "find target -maxdepth 1 -name '*.jar' -print -quit", returnStdout: true).trim()
+                            if (jarFile.isEmpty()) {
+                                error("No JAR file found in target/ for service ${service}. Current dir: ${pwd()}")
+                            }
                             
-                            def artifactNameWithExt = jarFile.split('/' ).last() 
-                            def artifactName = artifactNameWithExt.take(artifactNameWithExt.lastIndexOf('.' )) 
-        
+                            def artifactNameWithExt = jarFile.split('/').last()
+                            def artifactName = artifactNameWithExt.take(artifactNameWithExt.lastIndexOf('.'))
+
                             sh """ 
-                            echo "Copying Dockerfile..." 
-                            cp ../docker/Dockerfile . 
-                            echo "Building Docker image for ${service} with ARTIFACT_NAME=${artifactName} ..." 
-                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID}  . 
-                            echo "Tagging Docker image..." 
-                            docker tag \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID} \${DOCKER_HUB_USERNAME}/petclinic-\${service}:latest 
-                            echo "Logging into Docker Hub..." 
-                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u \${DOCKER_HUB_USERNAME}  --password-stdin 
-                            echo "Pushing Docker image with commit ID tag..." 
-                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID} 
-                            echo "Pushing Docker image with latest tag..." 
-                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${service}:latest 
-                            echo "Docker image push complete for ${service} ." 
-                            """ 
-                        } 
-                    } 
-                } 
-            } 
+                            cp ../docker/Dockerfile .
+                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID} .
+                            docker tag \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID} \${DOCKER_HUB_USERNAME}/petclinic-\${service}:latest
+                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
+                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${service}:\${COMMIT_ID}
+                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${service}:latest
+                            """
+                        }
+                    }
+                }
+            }
         }
     }
     
