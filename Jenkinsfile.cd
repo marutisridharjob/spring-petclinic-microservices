@@ -105,10 +105,7 @@ pipeline {
                         def manifestFile = "k8s/${serviceKey}.yaml"
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
-                            
-                            // Sử dụng dollar-slashy string và export biến
-                            // Truy cập DOCKER_HUB_CREDS_USR trực tiếp vì DOCKER_HUB_USERNAME đã được định nghĩa từ nó
-                            sh $/
+                            sh $/                            
                                 set -x
                                 # Export variables for sed, ensuring they are quoted for shell safety
                                 export SED_DOCKER_HUB_USERNAME="${DOCKER_HUB_CREDS_USR}"
