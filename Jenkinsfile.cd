@@ -108,19 +108,19 @@ pipeline {
                             sh """
                             set -x
                             # Xuất các biến để sed có thể sử dụng chúng
-                            export SED_DOCKER_HUB_USERNAME="${shellDockerHubUsername}"
+                            export SED_DOCKER_HUB_USERNAME="${shellDocker_HUB_USERNAME}"
                             export SED_IMAGE_TAG="${shellImageTag}"
                             export SED_TARGET_NAMESPACE="${shellTargetNamespace}"
-                        
-                            cat "${manifestFile}" | \
-                            sed -e 's~\\${\\s*DOCKER_HUB_USERNAME\\s*}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \
-                                -e 's~\\${\\s*TAG\\s*}~'"\${SED_IMAGE_TAG}"'~g' \
+
+                            cat "${manifestFile}" | \\
+                            sed -e 's~\\$\\{DOCKER_HUB_USERNAME\\}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \\
+                                -e 's~\\$\\{TAG\\}~'"\${SED_IMAGE_TAG}"'~g' \\
                                 -e 's~namespace:\\s*petclinic~namespace: '"\${SED_TARGET_NAMESPACE}"'~g' > manifest_temp.yaml
-                            
+
                             echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
                             cat manifest_temp.yaml
                             echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
-                            
+
                             kubectl apply -n "${params.TARGET_NAMESPACE}" -f manifest_temp.yaml
                             set +x
                             """
