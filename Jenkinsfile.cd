@@ -14,7 +14,7 @@ pipeline {
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub')
-        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}"
+        // DOCKER_HUB_USERNAME sẽ được truy cập trực tiếp từ DOCKER_HUB_CREDS_USR
     }
     
     stages {
@@ -30,7 +30,8 @@ pipeline {
         stage('Prepare Image Tags') {
             steps {
                 script {
-                    def tagMap = [:]
+                    // Sử dụng biến cục bộ để xây dựng map, sau đó lưu từng giá trị vào env
+                    def localTagMap = [:]
 
                     def servicesParams = [
                         'api-gateway'     : params.API_GATEWAY_BRANCH,
@@ -52,20 +53,25 @@ pipeline {
                             echo "Using direct commit ID '${imageTag}' for ${serviceName}."
                         } else {
                             try {
-                                sh "git fetch origin ${branchOrCommit} --depth=1"
-                                imageTag = sh(script: "git rev-parse --short origin/${branchOrCommit}", returnStdout: true).trim()
+                                // Đảm bảo không có lỗi nếu branchOrCommit chứa ký tự đặc biệt cho shell
+                                sh "git fetch origin \"${branchOrCommit}\" --depth=1"
+                                imageTag = sh(script: "git rev-parse --short \"origin/${branchOrCommit}\"", returnStdout: true).trim()
                                 echo "Resolved branch '${branchOrCommit}' to commit ID '${imageTag}' for ${serviceName}."
                             } catch (Exception e) {
                                 echo "Warning: Could not resolve branch '${branchOrCommit}' for service ${serviceName}. Defaulting to 'latest'. Error: ${e.getMessage()}"
                                 imageTag = 'latest'
                             }
                         }
-                        tagMap[serviceName] = imageTag
+                        localTagMap[serviceName] = imageTag // Dùng cho env.TAG_SERVICES_JSON
+                        // Tạo biến môi trường riêng cho mỗi service để sed dễ sử dụng
                         env["TAG_${serviceName.toUpperCase().replace('-', '_')}"] = imageTag
                         echo "Stored image tag for ${serviceName}: ${imageTag}"
                     }
-                    env.TAG_SERVICES = tagMap.keySet().join(',')
-                    echo "Services with tags: ${env.TAG_SERVICES}"
+                    // Lưu danh sách các service key có tag vào env (dưới dạng JSON để dễ parse nếu cần)
+                    // Hoặc đơn giản là lặp lại servicesParams.keySet() trong stage sau
+                    // import groovy.json.JsonOutput
+                    // env.TAG_MAP_JSON = JsonOutput.toJson(localTagMap) 
+                    // Hiện tại chúng ta dùng env["TAG_SERVICE_NAME"] nên không cần TAG_MAP_JSON nữa
                 }
             }
         }
@@ -73,11 +79,11 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh "kubectl create namespace ${params.TARGET_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
+                    sh "kubectl create namespace \"${params.TARGET_NAMESPACE}\" --dry-run=client -o yaml | kubectl apply -f -"
                     
                     def manifestFiles = [
                         'discovery-server',
-                        'config-server',
+                        // 'config-server', // Bỏ qua nếu không có manifest
                         'admin-server',
                         'api-gateway',
                         'customers-service',
@@ -87,30 +93,32 @@ pipeline {
                     ]
 
                     manifestFiles.each { serviceKey ->
-                        def serviceEnvKey = "TAG_${serviceKey.toUpperCase().replace('-', '_')}"
-                        def imageTag = env[serviceEnvKey]
+                        def serviceEnvKeyForTag = "TAG_${serviceKey.toUpperCase().replace('-', '_')}"
+                        // Lấy imageTag từ biến env đã đặt ở stage trước
+                        def currentImageTag = env[serviceEnvKeyForTag]
 
-                        if (imageTag == null) {
-                            echo "Warning: No image tag found for service manifest '${serviceKey}'. Skipping deployment or using default from manifest if any."
-                            imageTag = 'latest'
+                        if (currentImageTag == null) {
+                            echo "Warning: No specific image tag found in env for '${serviceKey}' (env var ${serviceEnvKeyForTag}). Defaulting to 'latest'."
+                            currentImageTag = 'latest' // Fallback an toàn
                         }
                         
                         def manifestFile = "k8s/${serviceKey}.yaml"
                         if (fileExists(manifestFile)) {
-                            echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
+                            echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
                             
-                            // Use dollar-slashy string to avoid escaping issues
+                            // Sử dụng dollar-slashy string và export biến
+                            // Truy cập DOCKER_HUB_CREDS_USR trực tiếp vì DOCKER_HUB_USERNAME đã được định nghĩa từ nó
                             sh $/
                                 set -x
-                                # Export variables for sed
-                                export SED_DOCKER_HUB_USERNAME="${DOCKER_HUB_USERNAME}"
-                                export SED_IMAGE_TAG="${imageTag}"
+                                # Export variables for sed, ensuring they are quoted for shell safety
+                                export SED_DOCKER_HUB_USERNAME="${DOCKER_HUB_CREDS_USR}"
+                                export SED_IMAGE_TAG="${currentImageTag}"
                                 export SED_TARGET_NAMESPACE="${params.TARGET_NAMESPACE}"
 
                                 cat "${manifestFile}" | \
-                                sed -e 's~\${DOCKER_HUB_USERNAME}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \
-                                    -e 's~\${TAG}~'"\${SED_IMAGE_TAG}"'~g' \
-                                    -e 's~namespace:\\s*petclinic~namespace: '\${SED_TARGET_NAMESPACE}'~g' > manifest_temp.yaml
+                                sed -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'"\$SED_DOCKER_HUB_USERNAME"'~g' \
+                                    -e 's~\${\s*TAG\s*}~'"\$SED_IMAGE_TAG"'~g' \
+                                    -e 's~namespace:\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE"'~g' > manifest_temp.yaml
                                 
                                 echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
                                 cat manifest_temp.yaml
@@ -122,7 +130,7 @@ pipeline {
                             
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
                                 echo "Waiting for ${serviceKey} to stabilize..."
-                                sh "sleep 30"
+                                sh "sleep 30" // Cân nhắc dùng: kubectl rollout status deployment/...
                             } else {
                                 sh "sleep 5"
                             }
@@ -134,17 +142,22 @@ pipeline {
                     // API Gateway NodePort
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
-                        sh """
-                        cat ${apiGatewayNodePortManifest} | \
-                        sed -e 's~namespace:\\s*petclinic~namespace: ${params.TARGET_NAMESPACE}~g' > nodeport_temp.yaml
-                        kubectl apply -n ${params.TARGET_NAMESPACE} -f nodeport_temp.yaml
-                        """
+                        sh $/
+                            set -x
+                            export SED_TARGET_NAMESPACE="${params.TARGET_NAMESPACE}"
+                            cat "${apiGatewayNodePortManifest}" | \
+                            sed -e 's~namespace:\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE"'~g' > nodeport_temp.yaml
+                            
+                            kubectl apply -n "${params.TARGET_NAMESPACE}" -f nodeport_temp.yaml
+                            set +x
+                        /$
                     } else {
                         echo "Warning: API Gateway NodePort manifest ${apiGatewayNodePortManifest} not found."
                     }
 
-                    def workerNodeIP = sh(script: 'kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o jsonpath=\'{.items[0].status.addresses[?(@.type=="InternalIP")].address}\'', returnStdout: true).trim()
-                    def nodePort = sh(script: "kubectl get svc api-gateway-nodeport -n ${params.TARGET_NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}'", returnStdout: true).trim()
+                    // Sửa lỗi quoting cho jsonpath
+                    def workerNodeIP = sh(script: 'kubectl get nodes -l \'!node-role.kubernetes.io/control-plane\' -o jsonpath=\'{.items[0].status.addresses[?(@.type=="InternalIP")].address}\'', returnStdout: true).trim()
+                    def nodePort = sh(script: "kubectl get svc api-gateway-nodeport -n \"${params.TARGET_NAMESPACE}\" -o jsonpath='{.spec.ports[0].nodePort}'", returnStdout: true).trim()
 
                     if (workerNodeIP.isEmpty() || nodePort.isEmpty()) {
                         echo "Could not determine Worker Node IP or NodePort. Please check manually."
@@ -165,8 +178,7 @@ pipeline {
     post {
         always {
             echo "CD Pipeline finished."
-            // Clean up temporary files
-            sh "rm -f manifest_temp.yaml nodeport_temp.yaml"
+            sh "rm -f manifest_temp.yaml nodeport_temp.yaml || true" // Thêm || true để không lỗi nếu file không tồn tại
         }
     }
 }
