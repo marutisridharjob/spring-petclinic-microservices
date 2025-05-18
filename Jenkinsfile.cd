@@ -1,0 +1,186 @@
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'API_GATEWAY_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for api-gateway. Use "main" for latest, or a specific commit ID.')
+        string(name: 'ADMIN_SERVER_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for admin-server.')
+        string(name: 'CUSTOMERS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for customers-service.')
+        string(name: 'DISCOVERY_SERVER_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for discovery-server.')
+        string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for vets-service.')
+        string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for visits-service.')
+        string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch/CommitID for genai-service.')
+        // Add config-server if you build an image for it
+        string(name: 'TARGET_NAMESPACE', defaultValue: 'petclinic-devtest', description: 'Kubernetes namespace to deploy to.')
+    }
+    
+    environment {
+        DOCKER_HUB_CREDS = credentials('dockerhub')
+        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}"
+        // KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-cicd' // Nếu bạn lưu kubeconfig dưới dạng secret file
+    }
+    
+    stages {
+        stage('Checkout Kubernetes Manifests') {
+            steps {
+                // Checkout repository chứa Kubernetes manifests (k8s/) và Jenkinsfile.cd này
+                // Giả sử nó cùng repo với source code
+                checkout([$class: 'GitSCM', 
+                    branches: [[name: 'main']], // Hoặc branch chứa k8s manifests ổn định
+                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02.git']]
+                ])
+                // Nếu kubeconfig được lưu dưới dạng secret file trong Jenkins:
+                // withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG_FILE')]) {
+                //     sh "mkdir -p \$HOME/.kube"
+                //     sh "cp \${KUBECONFIG_FILE} \$HOME/.kube/config"
+                //     sh "chmod 600 \$HOME/.kube/config"
+                // }
+                // Nếu Jenkins master/agent đã được cấu hình kubectl để truy cập K8s cluster rồi thì không cần bước trên.
+            }
+        }
+        
+        stage('Prepare Image Tags') {
+            steps {
+                script {
+                    env.TAG_MAP = [:] // Map để lưu trữ service_name -> image_tag
+
+                    def servicesParams = [
+                        'api-gateway'     : params.API_GATEWAY_BRANCH,
+                        'admin-server'    : params.ADMIN_SERVER_BRANCH,
+                        'customers-service': params.CUSTOMERS_SERVICE_BRANCH,
+                        'discovery-server': params.DISCOVERY_SERVER_BRANCH,
+                        'vets-service'    : params.VETS_SERVICE_BRANCH,
+                        'visits-service'  : params.VISITS_SERVICE_BRANCH,
+                        'genai-service'   : params.GENAI_SERVICE_BRANCH
+                        // 'config-server' : params.CONFIG_SERVER_BRANCH // Nếu có
+                    ]
+
+                    servicesParams.each { serviceName, branchOrCommit ->
+                        def imageTag
+                        if (branchOrCommit.toLowerCase() == 'main' || branchOrCommit.toLowerCase() == 'latest') {
+                            imageTag = 'latest'
+                        } else if (branchOrCommit.matches('[a-f0-9]{7,40}')) { // Kiểm tra xem có phải là commit hash không
+                            imageTag = branchOrCommit
+                            echo "Using direct commit ID '${imageTag}' for ${serviceName}."
+                        } else {
+                            // Nếu là tên branch khác main, lấy commit ID cuối cùng của branch đó
+                            // Cần fetch thông tin branch đó từ remote
+                            try {
+                                sh "git fetch origin ${branchOrCommit} --depth=1" // Fetch chỉ branch đó
+                                imageTag = sh(script: "git rev-parse --short origin/${branchOrCommit}", returnStdout: true).trim()
+                                echo "Resolved branch '${branchOrCommit}' to commit ID '${imageTag}' for ${serviceName}."
+                            } catch (Exception e) {
+                                echo "Warning: Could not resolve branch '${branchOrCommit}' for service ${serviceName}. Defaulting to 'latest'. Error: ${e.getMessage()}"
+                                imageTag = 'latest' // Fallback
+                            }
+                        }
+                        env.TAG_MAP[serviceName] = imageTag
+                        echo "Image tag for ${serviceName}: ${imageTag}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    // Tạo namespace nếu chưa tồn tại
+                    sh "kubectl create namespace ${params.TARGET_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
+                    
+                    // Danh sách các file manifest theo thứ tự deploy (discovery trước)
+                    // Tên file manifest phải khớp với tên trong thư mục k8s/ của bạn
+                    def manifestFiles = [
+                        'discovery-server', // Service này cần chạy trước
+                        'config-server',    // Nếu có và cần chạy sớm
+                        'admin-server',
+                        'api-gateway',      // API Gateway thường phụ thuộc vào các service khác
+                        'customers-service',
+                        'vets-service',
+                        'visits-service',
+                        'genai-service'
+                    ]
+
+                    manifestFiles.each { serviceKey ->
+                        // serviceKey là phần tên file manifest, ví dụ 'discovery-server'
+                        // serviceNameForTagMap là key trong TAG_MAP, ví dụ 'discovery-server'
+                        // Chúng có thể giống nhau, hoặc bạn cần logic map nếu khác.
+                        // Giả sử serviceKey = serviceNameForTagMap
+                        def serviceNameForTagMap = serviceKey 
+                        def imageTag = env.TAG_MAP[serviceNameForTagMap]
+
+                        if (imageTag == null) {
+                            echo "Warning: No image tag found for service manifest '${serviceKey}'. Skipping deployment or using default from manifest if any."
+                            // Hoặc có thể lỗi nếu đây là service bắt buộc
+                            // error "Missing image tag for ${serviceKey}"
+                            // Hoặc lấy tag mặc định
+                            imageTag = 'latest' // Fallback an toàn
+                        }
+                        
+                        def manifestFile = "k8s/${serviceKey}.yaml" // Đường dẫn tới file manifest
+                        if (fileExists(manifestFile)) {
+                            echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceNameForTagMap}..."
+                            // Sử dụng DOCKER_HUB_USERNAME và imageTag để thay thế placeholder trong manifest
+                            // Giả sử manifest của bạn có placeholder là \${DOCKER_HUB_USERNAME} và \${TAG}
+                            sh """
+                            cat ${manifestFile} | \\
+                            sed 's|\\\${DOCKER_HUB_USERNAME}|${env.DOCKER_HUB_USERNAME}|g' | \\
+                            sed 's|\\\${TAG}|${imageTag}|g' | \\
+                            sed 's|namespace: petclinic|namespace: ${params.TARGET_NAMESPACE}|g' | \\
+                            kubectl apply -n ${params.TARGET_NAMESPACE} -f -
+                            """
+                            if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
+                                echo "Waiting for ${serviceKey} to stabilize..."
+                                sh "sleep 30" // Đợi service quan trọng khởi động
+                                // Kiểm tra kỹ hơn: kubectl rollout status deployment/<deployment-name> -n <namespace>
+                            } else {
+                                sh "sleep 5" // Đợi ngắn cho các service khác
+                            }
+                        } else {
+                            echo "Warning: Manifest file ${manifestFile} not found. Skipping."
+                        }
+                    }
+                    
+                    // Deploy NodePort service cho API Gateway
+                    def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
+                    if (fileExists(apiGatewayNodePortManifest)) {
+                        sh """
+                        cat ${apiGatewayNodePortManifest} | \\
+                        sed 's|namespace: petclinic|namespace: ${params.TARGET_NAMESPACE}|g' | \\
+                        kubectl apply -n ${params.TARGET_NAMESPACE} -f -
+                        """
+                    } else {
+                        echo "Warning: API Gateway NodePort manifest ${apiGatewayNodePortManifest} not found."
+                    }
+
+                    // Lấy địa chỉ IP của Worker node và port của NodePort service
+                    // Điều này phụ thuộc vào cách bạn expose NodePort service.
+                    // Giả sử NodePort service tên là 'api-gateway-nodeport' và port là 30080
+                    def workerNodeIP = sh(script: 'kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o jsonpath="{.items[0].status.addresses[?(@.type==\\"InternalIP\\")].address}"', returnStdout: true).trim()
+                    // Nếu có nhiều worker, lệnh trên chỉ lấy worker đầu tiên.
+                    // Hoặc nếu bạn biết tên worker:
+                    // def workerNodeIP = sh(script: 'kubectl get node k8s-worker -o jsonpath="{.status.addresses[?(@.type==\\"InternalIP\\")].address}"', returnStdout: true).trim()
+
+                    def nodePort = sh(script: "kubectl get svc api-gateway-nodeport -n ${params.TARGET_NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}'", returnStdout: true).trim()
+
+                    if (workerNodeIP.isEmpty() || nodePort.isEmpty()) {
+                        echo "Could not determine Worker Node IP or NodePort. Please check manually."
+                    } else {
+                        echo "====================================================="
+                        echo "Ứng dụng Petclinic đã được triển khai vào namespace: ${params.TARGET_NAMESPACE}"
+                        echo "Bạn có thể truy cập ứng dụng tại: http://${workerNodeIP}:${nodePort}"
+                        echo "Nếu truy cập từ máy local, hãy thêm dòng sau vào file /etc/hosts (hoặc C:\\Windows\\System32\\drivers\\etc\\hosts trên Windows):"
+                        echo "${workerNodeIP} petclinic-${params.TARGET_NAMESPACE}.local"
+                        echo "Sau đó, bạn có thể truy cập ứng dụng tại: http://petclinic-${params.TARGET_NAMESPACE}.local:${nodePort}"
+                        echo "====================================================="
+                    }
+                }
+            }
+        }
+    }
+     post {
+        always {
+            // Không nên cleanWs() ở đây nếu bạn muốn kiểm tra manifest đã checkout
+            // Hoặc chỉ cleanWs() nếu thành công
+            echo "CD Pipeline finished."
+        }
+    }
+}
