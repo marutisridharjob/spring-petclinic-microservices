@@ -113,9 +113,9 @@ pipeline {
                             export SED_TARGET_NAMESPACE="${shellTargetNamespace}"
                         
                             cat "${manifestFile}" | \
-                            sed -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \
-                                -e 's~\${\s*TAG\s*}~'"\${SED_IMAGE_TAG}"'~g' \
-                                -e 's~namespace:\s*petclinic~namespace: '"\${SED_TARGET_NAMESPACE}"'~g' > manifest_temp.yaml
+                            sed -e 's~\\${\\s*DOCKER_HUB_USERNAME\\s*}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \
+                                -e 's~\\${\\s*TAG\\s*}~'"\${SED_IMAGE_TAG}"'~g' \
+                                -e 's~namespace:\\s*petclinic~namespace: '"\${SED_TARGET_NAMESPACE}"'~g' > manifest_temp.yaml
                             
                             echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
                             cat manifest_temp.yaml
@@ -139,7 +139,7 @@ pipeline {
                     // Cũng áp dụng cách tiếp cận tương tự cho API Gateway NodePort
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
-                        def sedExprNodeportNamespace = 's~namespace: petclinic~namespace: ' + "${params.TARGET_NAMESPACE}" + '~g'
+                        def sedExprNodeportNamespace = 's~namespace:\\s*petclinic~namespace: ' + "${params.TARGET_NAMESPACE}" + '~g'
                         
                         sh """
                         cat ${apiGatewayNodePortManifest} | \
