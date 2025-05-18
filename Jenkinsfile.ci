@@ -34,11 +34,22 @@ pipeline {
                     
                     services.each { service ->
                         dir(service) {
+                            // Find the generated JAR file. This assumes one JAR in target/
+                            // Adjust if your project structure or naming is different.
+                            // This looks for any .jar file in the target directory.
+                            def jarFile = sh(script: 'find target -maxdepth 1 -name "*.jar" -print -quit', returnStdout: true ).trim()
+                            if  (jarFile.isEmpty()) {
+                                error("No JAR file found in target/ for service ${service}" )
+                            }
+                            // Extract just the filename without the "target/" prefix and ".jar" suffix
+                            def artifactNameWithExt = jarFile.split('/').last() // e.g., spring-petclinic-admin-server-3.4.1.jar
+                            def artifactName = artifactNameWithExt.take(artifactNameWithExt.lastIndexOf('.')) // e.g., spring-petclinic-admin-server-3.4.1
+
                             sh """
                             cp ../docker/Dockerfile .
-                            docker build -t ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID} .
+                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID}  .
                             docker tag ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID} ${DOCKER_HUB_USERNAME}/petclinic-${service}:latest
-                            echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin
+                            echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_USERNAME}  --password-stdin
                             docker push ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID}
                             docker push ${DOCKER_HUB_USERNAME}/petclinic-${service}:latest
                             """
