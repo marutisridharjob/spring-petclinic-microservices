@@ -70,14 +70,27 @@ pipeline {
 
                             // Determine the base service name for the Docker image tag (e.g., admin-server from spring-petclinic-admin-server)
                             def dockerImageServiceName = serviceDirName.replace('spring-petclinic-', '')
+                            echo "DEBUG: serviceDirName = '${serviceDirName}'"
+                            echo "DEBUG: dockerImageServiceName = '${dockerImageServiceName}'" // Print its value
+                            echo "DEBUG: DOCKER_HUB_USERNAME = '${DOCKER_HUB_USERNAME}'"
+                            echo "DEBUG: COMMIT_ID = '${COMMIT_ID}'"
+                            echo "DEBUG: Full Docker Tag will be: '${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}'"
+
 
                             sh """ 
+                            echo "--- Docker Build Step ---" 
+                            echo "Service Directory Name: ${serviceDirName}" 
+                            echo "Docker Image Service Name: ${dockerImageServiceName}" # Also echo inside sh 
+                            echo "Artifact Name for build-arg: ${artifactName}" 
+                            echo "Commit ID: \${COMMIT_ID}" 
+                            echo "Docker Hub Username: \${DOCKER_HUB_USERNAME}" 
+                            echo "--------------------------" 
                             cp ../docker/Dockerfile .
-                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:\${COMMIT_ID} .
-                            docker tag \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:\${COMMIT_ID} \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:latest
-                            echo \${DOCKER_HUB_CREDS_ PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
-                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:\${COMMIT_ID}
-                            docker push \${DOCKER_HUB_USERNAME}/petclinic-\${dockerImageServiceName}:latest
+                            docker build --build-arg ARTIFACT_NAME=${artifactName} -t "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}" . # Added quotes around the tag
+                            docker tag "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}" "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
+                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
+                            docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}"
+                            docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
                             """
                         }
                     }
