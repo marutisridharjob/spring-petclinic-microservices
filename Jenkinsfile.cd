@@ -1,4 +1,4 @@
-import java.util.regex.Pattern // Giữ lại, có thể hữu ích nếu cần debug phức tạp hơn
+import java.util.regex.Pattern // Giữ lại, không hại gì
 
 pipeline {
     agent any
@@ -16,6 +16,8 @@ pipeline {
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub')
+        // KHAI BÁO LẠI DOCKER_HUB_USERNAME Ở ĐÂY
+        // Hoặc chúng ta sẽ truy cập DOCKER_HUB_CREDS_USR trực tiếp trong script block nếu cần
     }
     
     stages {
@@ -31,8 +33,6 @@ pipeline {
         stage('Prepare Image Tags') {
             steps {
                 script {
-                    // Khai báo map cục bộ, không gán trực tiếp env.TAG_MAP = [:] ở đây
-                    // vì chúng ta sẽ đặt từng tag vào biến env riêng biệt.
                     def localTagMapForInfo = [:] 
 
                     def servicesParams = [
@@ -63,8 +63,7 @@ pipeline {
                                 imageTag = 'latest'
                             }
                         }
-                        localTagMapForInfo[serviceName] = imageTag // Chỉ dùng để in thông tin nếu cần
-                        // Tạo biến môi trường Jenkins riêng cho mỗi service tag
+                        localTagMapForInfo[serviceName] = imageTag
                         env["TAG_${serviceName.toUpperCase().replace('-', '_')}"] = imageTag
                         echo "Stored image tag for ${serviceName} in env.TAG_${serviceName.toUpperCase().replace('-', '_')}: ${imageTag}"
                     }
@@ -95,21 +94,23 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
                             
-                            // Sử dụng GString (triple-double-quotes) cho toàn bộ khối sh
-                            // Groovy sẽ nội suy các biến ${DOCKER_HUB_CREDS_USR}, ${currentImageTag}, ${params.TARGET_NAMESPACE}
-                            // vào các lệnh `export` của shell.
-                            // Sau đó, các lệnh `sed` sẽ sử dụng các biến môi trường shell này.
+                            // SỬ DỤNG DOCKER_HUB_CREDS_USR TRỰC TIẾP TỪ CREDENTIALS
+                            // KHÔNG CẦN KHAI BÁO LẠI DOCKER_HUB_USERNAME TRONG environment {}
+                            def shellDockerHubUsername = DOCKER_HUB_CREDS_USR 
+                            def shellImageTag = currentImageTag 
+                            def shellTargetNamespace = params.TARGET_NAMESPACE 
+
                             sh """
                                 set -x
-                                export SED_DOCKER_HUB_USERNAME_EXPORTED="${DOCKER_HUB_CREDS_USR}"
-                                export SED_IMAGE_TAG_EXPORTED="${currentImageTag}"
-                                export SED_TARGET_NAMESPACE_EXPORTED="${params.TARGET_NAMESPACE}"
+                                export SED_DOCKER_HUB_USERNAME_EXPORTED="${shellDockerHubUsername}"
+                                export SED_IMAGE_TAG_EXPORTED="${shellImageTag}"
+                                export SED_TARGET_NAMESPACE_EXPORTED="${shellTargetNamespace}"
 
                                 cat "${manifestFile}" | \\
                                 sed \\
-                                    -e 's~\\${DOCKER_HUB_USERNAME}~'"\$SED_DOCKER_HUB_USERNAME_EXPORTED"'~g' \\
-                                    -e 's~\\${TAG}~'"\$SED_IMAGE_TAG_EXPORTED"'~g' \\
-                                    -e 's~namespace: *petclinic~namespace: '"\$SED_TARGET_NAMESPACE_EXPORTED"'~g' \\
+                                    -e 's~\\\$\\\\{\\s*DOCKER_HUB_USERNAME\\s*\\}~'"\$SED_DOCKER_HUB_USERNAME_EXPORTED"'~g' \\
+                                    -e 's~\\\$\\\\{\\s*TAG\\s*\\}~'"\$SED_IMAGE_TAG_EXPORTED"'~g' \\
+                                    -e 's~namespace:\\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE_EXPORTED"'~g' \\
                                     > manifest_temp.yaml
                                 
                                 echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
@@ -133,11 +134,12 @@ pipeline {
                     
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
+                        def shellTargetNamespaceForNodePort = params.TARGET_NAMESPACE
                         sh """
                             set -x
-                            export SED_TARGET_NAMESPACE_NODEPORT_EXPORTED="${params.TARGET_NAMESPACE}"
+                            export SED_TARGET_NAMESPACE_NODEPORT_EXPORTED="${shellTargetNamespaceForNodePort}"
                             cat "${apiGatewayNodePortManifest}" | \\
-                            sed -e 's~namespace: *petclinic~namespace: '"\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED"'~g' \\
+                            sed -e 's~namespace:\\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED"'~g' \\
                                 > nodeport_temp.yaml
                             
                             kubectl apply -n "\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED" -f nodeport_temp.yaml
@@ -156,10 +158,7 @@ pipeline {
                         echo "====================================================="
                         echo "Ứng dụng Petclinic đã được triển khai vào namespace: ${params.TARGET_NAMESPACE}"
                         echo "Bạn có thể truy cập ứng dụng tại: http://${workerNodeIP}:${nodePort}"
-                        echo "Nếu truy cập từ máy local, hãy thêm dòng sau vào file /etc/hosts (hoặc C:\\Windows\\System32\\drivers\\etc\\hosts trên Windows):"
-                        echo "${workerNodeIP} petclinic-${params.TARGET_NAMESPACE}.local"
-                        echo "Sau đó, bạn có thể truy cập ứng dụng tại: http://petclinic-${params.TARGET_NAMESPACE}.local:${nodePort}"
-                        echo "====================================================="
+                        // ... (phần echo thông tin hosts)
                     }
                 }
             }
