@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: discovery-server
-        image: \${DOCKER_HUB_USERNAME}/petclinic-discovery-server:\${TAG}
+        image: ${DOCKER_HUB_USERNAME}/petclinic-discovery-server:${TAG}
         ports:
         - containerPort: 8761
 ---
