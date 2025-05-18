@@ -48,13 +48,16 @@ pipeline {
                         if (branchOrCommit.toLowerCase() == 'main' || branchOrCommit.toLowerCase() == 'latest') {
                             imageTag = 'latest'
                         } else if (branchOrCommit.matches('[a-f0-9]{7,40}')) {
-                            imageTag = branchOrCommit
-                            echo "Using direct commit ID '${imageTag}' for ${serviceName}."
+                            // If it's already a commit hash, take the first 7 characters
+                            imageTag = branchOrCommit.take(7)
+                            echo "Using direct commit ID '${branchOrCommit}', using tag '${imageTag}' (first 7 chars) for ${serviceName}."
                         } else {
                             try {
                                 sh "git fetch origin \"${branchOrCommit}\" --depth=1"
-                                imageTag = sh(script: "git rev-parse --short \"origin/${branchOrCommit}\"", returnStdout: true).trim()
-                                echo "Resolved branch '${branchOrCommit}' to commit ID '${imageTag}' for ${serviceName}."
+                                def fullShortCommit = sh(script: "git rev-parse --short \"origin/${branchOrCommit}\"", returnStdout: true).trim()
+                                // Lấy 7 ký tự đầu tiên
+                                imageTag = fullShortCommit.take(7)
+                                echo "Resolved branch '${branchOrCommit}' to commit ID '${fullShortCommit}', using tag '${imageTag}' (first 7 chars) for ${serviceName}."
                             } catch (Exception e) {
                                 echo "Warning: Could not resolve branch '${branchOrCommit}' for service ${serviceName}. Defaulting to 'latest'. Error: ${e.getMessage()}"
                                 imageTag = 'latest'
