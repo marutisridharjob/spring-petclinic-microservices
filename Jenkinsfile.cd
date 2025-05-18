@@ -128,13 +128,18 @@ pipeline {
                             echo "DEBUG: imageTag for sed: ${imageTag}" // DEBUG
                             echo "DEBUG: TARGET_NAMESPACE for sed: ${params.TARGET_NAMESPACE}" // DEBUG
                             sh """
-                            set -x # In ra lệnh shell sẽ được thực thi
-                            cat "${manifestFile}" | \
-                            sed -e "s~\\\${DOCKER_HUB_USERNAME}~${env.DOCKER_HUB_USERNAME}~g" \
-                                -e "s~\\\${TAG}~${imageTag}~g" \
-                                -e "s~namespace: petclinic~namespace: ${params.TARGET_NAMESPACE}~g" | \
-                            kubectl apply -n "${params.TARGET_NAMESPACE}" -f -
-                            set +x
+                            set -x 
+                            PROCESSED_MANIFEST=\$(cat "${manifestFile}" | \\
+                            sed -e "s~\\\${DOCKER_HUB_USERNAME}~${env.DOCKER_HUB_USERNAME}~g" \\
+                                -e "s~\\\${TAG}~${imageTag}~g" \\
+                                -e "s~namespace: petclinic~namespace: ${params.TARGET_NAMESPACE}~g") 
+                            
+                            echo "--- PROCESSED MANIFEST for ${serviceKey} ---" 
+                            echo "\${PROCESSED_MANIFEST}" 
+                            echo "--- END PROCESSED MANIFEST ---" 
+                            
+                            echo "\${PROCESSED_MANIFEST}" | kubectl apply -n "${params.TARGET_NAMESPACE}" -f - 
+                            set +x 
                             """
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
                                 echo "Waiting for ${serviceKey} to stabilize..."
