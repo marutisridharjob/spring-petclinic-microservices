@@ -2,86 +2,157 @@ pipeline {
     agent any
     
     parameters {
-        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build')
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build from')
     }
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub')
-        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}" // Using Groovy GString for consistency
-        COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}"
+        // COMMIT_ID sẽ được lấy sau khi checkout
+        // SERVICES_TO_BUILD sẽ được đặt trong stage 'Detect Changed Services'
     }
     
     stages {
-        stage('Checkout') {
+        stage('Checkout and Set Commit ID') {
             steps {
                 checkout([$class: 'GitSCM', 
                     branches: [[name: "${params.BRANCH_NAME}"]], 
                     userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02.git']]
                 ])
+                script {
+                    env.COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    echo "Current Commit ID: ${env.COMMIT_ID}"
+                }
             }
         }
-        
-        stage('Build') {
-            steps {
-                sh './mvnw clean package -DskipTests'
-                
-                // --- DEBUGGING - You can remove or comment this out after it works ---
-                sh 'echo "--- Listing workspace root after Maven build ---"'
-                sh 'ls -l'
-                sh 'echo "--- Listing spring-petclinic-admin-server directory after Maven build ---"'
-                sh 'ls -l spring-petclinic-admin-server' // Corrected name
-                sh 'echo "--- Listing spring-petclinic-admin-server/target directory after Maven build (if it exists) ---"'
-                sh 'ls -lR spring-petclinic-admin-server/target || echo "spring-petclinic-admin-server/target not found or empty after build stage"'
-                // --- END DEBUGGING --- 
-            }
-        }
-        
-        stage('Build and Push Docker Images') {
+
+        stage('Detect Changed Services') {
             steps {
                 script {
-                    def services = [
-                        'spring-petclinic-admin-server',
+                    // Danh sách tất cả các service có thể build Docker image
+                    def allKnownServiceDirs = [
+                        'spring-petclinic-admin-server', 
                         'spring-petclinic-api-gateway',
+                        'spring-petclinic-config-server', // Thêm nếu bạn build image cho nó
                         'spring-petclinic-customers-service',
-                        'spring-petclinic-discovery-server',
+                        'spring-petclinic-discovery-server', // Thêm nếu bạn build image cho nó
+                        'spring-petclinic-genai-service',
                         'spring-petclinic-vets-service',
-                        'spring-petclinic-visits-service',
-                        'spring-petclinic-genai-service'
-                        // Add spring-petclinic-config-server if needed
+                        'spring-petclinic-visits-service'
                     ]
                     
-                    services.each { serviceDirName ->
+                    def baseCommit
+                    try {
+                        // Cố gắng fetch sâu hơn để đảm bảo có commit trước đó
+                        // Điều này quan trọng nếu Jenkins chỉ clone nông (shallow clone)
+                        sh "git fetch origin ${params.BRANCH_NAME} --prune --unshallow || git fetch origin ${params.BRANCH_NAME} --prune --depth=2"
+                        baseCommit = sh(script: "git rev-parse HEAD~1", returnStdout: true).trim()
+                        echo "Base commit for diff: ${baseCommit}"
+                    } catch (Exception e) {
+                        echo "No previous commit found (or error fetching history). Treating as first commit or manual build. Building all services."
+                        env.SERVICES_TO_BUILD = allKnownServiceDirs.join(',')
+                        return // Thoát khỏi script block của stage này
+                    }
+
+                    // Nếu build được trigger bởi người dùng mà không có SCM changes, hoặc không có baseCommit
+                    // currentBuild.changeSets có thể rỗng nếu không có thay đổi SCM thực sự trigger build này.
+                    if (currentBuild.changeSets.isEmpty() && currentBuild.get причиной().toString().contains('Started by user')) {
+                         echo "Manually started build, building all services."
+                         env.SERVICES_TO_BUILD = allKnownServiceDirs.join(',')
+                         return
+                    }
+
+                    def changedFilesRaw = sh(script: "git diff --name-only ${baseCommit} HEAD", returnStdout: true).trim()
+                    if (changedFilesRaw.isEmpty()) {
+                        echo "No file changes detected between ${baseCommit} and HEAD. Nothing to build."
+                        env.SERVICES_TO_BUILD = "" // Rỗng
+                        return
+                    }
+                    def changedFiles = changedFilesRaw.tokenize('\n')
+                    echo "Changed files: ${changedFiles}"
+
+                    def affectedServices = [] as Set // Dùng Set để không bị trùng
+
+                    // Kiểm tra các file chung trước
+                    if (changedFiles.any { it == 'pom.xml' || it.startsWith('docker/') }) {
+                        echo "Core pom.xml or docker/ directory changed. Rebuilding all services."
+                        env.SERVICES_TO_BUILD = allKnownServiceDirs.join(',')
+                        return
+                    }
+
+                    // Xác định service bị ảnh hưởng
+                    changedFiles.each { changedFile ->
+                        allKnownServiceDirs.each { serviceDir ->
+                            if (changedFile.startsWith(serviceDir + "/")) {
+                                affectedServices.add(serviceDir)
+                            }
+                        }
+                    }
+                    
+                    if (affectedServices.isEmpty()) {
+                        echo "Changes detected but not mapped to specific services. Not building any service-specific images."
+                        // env.SERVICES_TO_BUILD = allKnownServiceDirs.join(',')
+                        env.SERVICES_TO_BUILD = ""
+                    } else {
+                        env.SERVICES_TO_BUILD = affectedServices.join(',')
+                    }
+                    echo "Services to rebuild based on diff: ${env.SERVICES_TO_BUILD}"
+                }
+            }
+        }
+        
+        stage('Maven Build All Modules') {
+            when {
+                expression { env.SERVICES_TO_BUILD != null && !env.SERVICES_TO_BUILD.isEmpty() }
+            }
+            steps {
+                sh './mvnw clean package -DskipTests'
+            }
+        }
+        
+        stage('Build and Push Docker Images for Changed Services') {
+            when {
+                // Chỉ chạy stage này nếu có service cần build
+                expression { env.SERVICES_TO_BUILD != null && !env.SERVICES_TO_BUILD.isEmpty() }
+            }
+            steps {
+                script {
+                    def servicesToProcess = env.SERVICES_TO_BUILD.tokenize(',').collect { it.trim() }.findAll { !it.isEmpty() }
+                    
+                    if (servicesToProcess.isEmpty()) {
+                        echo "No services to process for Docker build after parsing SERVICES_TO_BUILD."
+                        return
+                    }
+                    
+                    echo "Final list of services for Docker build: ${servicesToProcess}"
+
+                    servicesToProcess.each { serviceDirName ->
                         dir(serviceDirName) {
-                            echo "Current directory inside loop: ${pwd()} for service ${serviceDirName}"
-                            sh 'ls -la target || echo "Target directory does not exist here or is empty for ${serviceDirName}."'
+                            echo "Processing Docker for: ${serviceDirName}"
+                            // sh 'ls -la target || echo "Target directory does not exist here or is empty for ${serviceDirName}."' // Debug
 
                             def artifactRelativePath = sh(script: "find target -maxdepth 1 -name '*.jar' -print -quit", returnStdout: true).trim()
                             if (artifactRelativePath.isEmpty()) {
                                 error("No JAR file found in target/ for service ${serviceDirName}. Current dir: ${pwd()}")
                             }
                             
-                            echo "DEBUG: serviceDirName = '${serviceDirName}'"
-                            echo "DEBUG: artifactRelativePath = '${artifactRelativePath}'" // Will be "target/service-version.jar"
-                            
                             def dockerImageServiceName = serviceDirName.replace('spring-petclinic-', '')
-                            echo "DEBUG: dockerImageServiceName = '${dockerImageServiceName}'"
-                            echo "DEBUG: DOCKER_HUB_USERNAME = '${DOCKER_HUB_USERNAME}'"
-                            echo "DEBUG: COMMIT_ID = '${COMMIT_ID}'"
-                            echo "DEBUG: Full Docker Tag will be: '${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}'"
+                            
+                            echo "DEBUG (Docker Stage): serviceDirName = '${serviceDirName}', artifactRelativePath = '${artifactRelativePath}', dockerImageServiceName = '${dockerImageServiceName}'"
 
                             sh """ 
-                            echo "--- Docker Build Step ---" 
-                            echo "Service Directory Name: ${serviceDirName}" 
-                            echo "Artifact Relative Path for build-arg: ${artifactRelativePath}" 
-                            echo "Commit ID: \${COMMIT_ID}" 
-                            echo "Docker Hub Username: \${DOCKER_HUB_USERNAME}" 
-                            echo "--------------------------" 
+                            echo "--- Docker Build Step for ${serviceDirName} ---"
                             cp ../docker/Dockerfile .
-                            docker build --build-arg ARTIFACT_PATH="${artifactRelativePath}" -t "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}" .
-                            docker tag "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}" "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
-                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
-                            docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}"
+                            docker build --build-arg ARTIFACT_PATH="${artifactRelativePath}" -t "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${env.COMMIT_ID}" .
+                            docker tag "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${env.COMMIT_ID}" "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
+                            echo "Attempting Docker login..."
+                            # Ensure DOCKER_HUB_CREDS_PSW is correctly available if using it directly
+                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u "${DOCKER_HUB_USERNAME}" --password-stdin
+                            echo "Pushing ${dockerImageServiceName}:${env.COMMIT_ID}..."
+                            docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${env.COMMIT_ID}"
+                            echo "Pushing ${dockerImageServiceName}:latest..."
                             docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
+                            echo "--- Docker Build Step for ${serviceDirName} COMPLETE ---"
                             """
                         }
                     }
