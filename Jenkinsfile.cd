@@ -105,16 +105,23 @@ pipeline {
                         def manifestFile = "k8s/${serviceKey}.yaml"
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
+                            
+                            // Truy cập DOCKER_HUB_CREDS_USR trực tiếp 
+                            def groovyDockerHubUsername = DOCKER_HUB_CREDS_USR 
+                            def groovyImageTag = currentImageTag 
+                            def groovyTargetNamespace = params.TARGET_NAMESPACE 
+
                             sh $/                            
-                                set -x
-                                export SED_DOCKER_HUB_USERNAME="${DOCKER_HUB_CREDS_USR}"
-                                export SED_IMAGE_TAG="${currentImageTag}"
-                                export SED_TARGET_NAMESPACE="${params.TARGET_NAMESPACE}"
+                                set -x 
+                                # Export các biến Groovy thành biến môi trường shell 
+                                export SED_DOCKER_HUB_USERNAME="${groovyDockerHubUsername}" 
+                                export SED_IMAGE_TAG="${groovyImageTag}" 
+                                export SED_TARGET_NAMESPACE="${groovyTargetNamespace}" 
 
                                 cat "${manifestFile}" | \
-                                sed -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'"\$SED_DOCKER_HUB_USERNAME"'~g' \
-                                    -e 's~\${\s*TAG\s*}~'"\$SED_IMAGE_TAG"'~g' \
-                                    -e 's~namespace:\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE"'~g' > manifest_temp.yaml
+                                sed -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'"$SED_DOCKER_HUB_USERNAME"'~g' \
+                                    -e 's~\${\s*TAG\s*}~'"$SED_IMAGE_TAG"'~g' \
+                                    -e 's~namespace:\s*petclinic~namespace: '"$SED_TARGET_NAMESPACE"'~g' > manifest_temp.yaml
                                 
                                 echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
                                 cat manifest_temp.yaml
