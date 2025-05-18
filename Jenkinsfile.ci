@@ -56,7 +56,7 @@ pipeline {
 
                     // Nếu build được trigger bởi người dùng mà không có SCM changes, hoặc không có baseCommit
                     // currentBuild.changeSets có thể rỗng nếu không có thay đổi SCM thực sự trigger build này.
-                    if (currentBuild.changeSets.isEmpty() && currentBuild.get причиной().toString().contains('Started by user')) {
+                    if (currentBuild.changeSets.isEmpty() && currentBuild.getCauses().toString().contains('Started by user')) {
                          echo "Manually started build, building all services."
                          env.SERVICES_TO_BUILD = allKnownServiceDirs.join(',')
                          return
