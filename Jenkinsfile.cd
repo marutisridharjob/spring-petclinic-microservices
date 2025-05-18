@@ -99,12 +99,16 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
                             
-                            // Fixed: Use a proper temp file approach to avoid sed escaping issues
+                            // Tạo các biểu thức sed một cách an toàn
+                            def sedExprUsername = 's~${DOCKER_HUB_USERNAME}~' + "${env.DOCKER_HUB_USERNAME}" + '~g'
+                            def sedExprTag = 's~${TAG}~' + "${imageTag}" + '~g'
+                            def sedExprNamespace = 's~namespace: petclinic~namespace: ' + "${params.TARGET_NAMESPACE}" + '~g'
+
                             sh """
                             cat "${manifestFile}" | \
-                            sed -e "s|\\${DOCKER_HUB_USERNAME}|${env.DOCKER_HUB_USERNAME}|g" \
-                                -e "s|\\${TAG}|${imageTag}|g" \
-                                -e "s|namespace: petclinic|namespace: ${params.TARGET_NAMESPACE}|g" > manifest_temp.yaml
+                            sed -e "${sedExprUsername}" \
+                                -e "${sedExprTag}" \
+                                -e "${sedExprNamespace}" > manifest_temp.yaml
                             
                             echo "--- PROCESSED MANIFEST for ${serviceKey} ---"
                             cat manifest_temp.yaml
@@ -124,11 +128,14 @@ pipeline {
                         }
                     }
                     
+                    // Cũng áp dụng cách tiếp cận tương tự cho API Gateway NodePort
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
+                        def sedExprNodeportNamespace = 's~namespace: petclinic~namespace: ' + "${params.TARGET_NAMESPACE}" + '~g'
+                        
                         sh """
                         cat ${apiGatewayNodePortManifest} | \
-                        sed -e "s|namespace: petclinic|namespace: ${params.TARGET_NAMESPACE}|g" > nodeport_temp.yaml
+                        sed -e "${sedExprNodeportNamespace}" > nodeport_temp.yaml
                         kubectl apply -n ${params.TARGET_NAMESPACE} -f nodeport_temp.yaml
                         """
                     } else {
