@@ -41,7 +41,8 @@ pipeline {
         stage('Prepare Image Tags') {
             steps {
                 script {
-                    env.TAG_MAP = [:] // Map để lưu trữ service_name -> image_tag
+                    // Sử dụng biến cục bộ thay vì env.TAG_MAP
+                    def tagMap = [:] // Map để lưu trữ service_name -> image_tag
 
                     def servicesParams = [
                         'api-gateway'     : params.API_GATEWAY_BRANCH,
@@ -55,6 +56,7 @@ pipeline {
                     ]
 
                     servicesParams.each { serviceName, branchOrCommit ->
+                        echo "Processing parameters for service: ${serviceName}, branch/commit input: ${branchOrCommit}"
                         def imageTag
                         if (branchOrCommit.toLowerCase() == 'main' || branchOrCommit.toLowerCase() == 'latest') {
                             imageTag = 'latest'
@@ -73,9 +75,16 @@ pipeline {
                                 imageTag = 'latest' // Fallback
                             }
                         }
-                        env.TAG_MAP[serviceName] = imageTag
-                        echo "Image tag for ${serviceName}: ${imageTag}"
+                        // Lưu vào biến cục bộ tagMap
+                        tagMap[serviceName] = imageTag
+                        // Tạo biến môi trường riêng cho mỗi service
+                        env["TAG_${serviceName.toUpperCase().replace('-', '_')}"] = imageTag
+                        echo "Stored image tag for ${serviceName}: ${imageTag}"
                     }
+                    // Lưu tagMap vào biến toàn cục để sử dụng trong các stage khác
+                    // Không thể lưu trực tiếp vào env
+                    env.TAG_SERVICES = tagMap.keySet().join(',')
+                    echo "Services with tags: ${env.TAG_SERVICES}"
                 }
             }
         }
@@ -100,12 +109,9 @@ pipeline {
                     ]
 
                     manifestFiles.each { serviceKey ->
-                        // serviceKey là phần tên file manifest, ví dụ 'discovery-server'
-                        // serviceNameForTagMap là key trong TAG_MAP, ví dụ 'discovery-server'
-                        // Chúng có thể giống nhau, hoặc bạn cần logic map nếu khác.
-                        // Giả sử serviceKey = serviceNameForTagMap
-                        def serviceNameForTagMap = serviceKey 
-                        def imageTag = env.TAG_MAP[serviceNameForTagMap]
+                        // Lấy tag từ biến môi trường riêng
+                        def serviceEnvKey = "TAG_${serviceKey.toUpperCase().replace('-', '_')}"
+                        def imageTag = env[serviceEnvKey]
 
                         if (imageTag == null) {
                             echo "Warning: No image tag found for service manifest '${serviceKey}'. Skipping deployment or using default from manifest if any."
@@ -117,7 +123,7 @@ pipeline {
                         
                         def manifestFile = "k8s/${serviceKey}.yaml" // Đường dẫn tới file manifest
                         if (fileExists(manifestFile)) {
-                            echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceNameForTagMap}..."
+                            echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
                             // Sử dụng DOCKER_HUB_USERNAME và imageTag để thay thế placeholder trong manifest
                             // Giả sử manifest của bạn có placeholder là \${DOCKER_HUB_USERNAME} và \${TAG}
                             sh """
