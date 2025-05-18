@@ -29,8 +29,7 @@ pipeline {
         stage('Prepare Image Tags') {
             steps {
                 script {
-                    def localTagMap = [:] // Không dùng trực tiếp env.TAG_MAP = [:]
-
+                    def localTagMap = [:]
                     def servicesParams = [
                         'api-gateway'     : params.API_GATEWAY_BRANCH,
                         'admin-server'    : params.ADMIN_SERVER_BRANCH,
@@ -40,7 +39,6 @@ pipeline {
                         'visits-service'  : params.VISITS_SERVICE_BRANCH,
                         'genai-service'   : params.GENAI_SERVICE_BRANCH
                     ]
-
                     servicesParams.each { serviceName, branchOrCommit ->
                         echo "Processing parameters for service: ${serviceName}, branch/commit input: ${branchOrCommit}"
                         def imageTag
@@ -60,7 +58,7 @@ pipeline {
                             }
                         }
                         localTagMap[serviceName] = imageTag
-                        env["TAG_${serviceName.toUpperCase().replace('-', '_')}"] = imageTag // Lưu vào env để stage sau dùng
+                        env["TAG_${serviceName.toUpperCase().replace('-', '_')}"] = imageTag
                         echo "Stored image tag for ${serviceName}: ${imageTag}"
                     }
                 }
@@ -84,39 +82,34 @@ pipeline {
 
                     manifestFiles.each { serviceKey ->
                         def serviceEnvKeyForTag = "TAG_${serviceKey.toUpperCase().replace('-', '_')}"
-                        def currentImageTag = env[serviceEnvKeyForTag]
-
-                        if (currentImageTag == null) {
-                            echo "Warning: No specific image tag found in env for '${serviceKey}' (env var ${serviceEnvKeyForTag}). Defaulting to 'latest'."
-                            currentImageTag = 'latest'
-                        }
+                        def currentImageTag = env[serviceEnvKeyForTag] ?: 'latest' // Fallback nếu null
                         
                         def manifestFile = "k8s/${serviceKey}.yaml"
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
                             
-                            // Truy cập trực tiếp biến từ credentials binding (DOCKER_HUB_CREDS_USR)
-                            // và các biến Groovy đã chuẩn bị
-                            def shellDockerHubUsername = DOCKER_HUB_CREDS_USR 
-                            def shellImageTag = currentImageTag 
-                            def shellTargetNamespace = params.TARGET_NAMESPACE 
+                            def groovyDockerHubUsername = DOCKER_HUB_CREDS_USR 
+                            def groovyImageTag = currentImageTag 
+                            def groovyTargetNamespace = params.TARGET_NAMESPACE 
 
                             sh $/                            
                                 set -x
-                                export SED_DOCKER_HUB_USERNAME_EXPORTED="${shellDockerHubUsername}"
-                                export SED_IMAGE_TAG_EXPORTED="${shellImageTag}"
-                                export SED_TARGET_NAMESPACE_EXPORTED="${shellTargetNamespace}"
+                                export SED_DOCKER_HUB_USERNAME_EXPORTED="${groovyDockerHubUsername}"
+                                export SED_IMAGE_TAG_EXPORTED="${groovyImageTag}"
+                                export SED_TARGET_NAMESPACE_EXPORTED="${groovyTargetNamespace}"
 
                                 cat "${manifestFile}" | \
-                                sed -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'$SED_DOCKER_HUB_USERNAME_EXPORTED'~g' \
+                                sed \
+                                    -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'$SED_DOCKER_HUB_USERNAME_EXPORTED'~g' \
                                     -e 's~\${\s*TAG\s*}~'$SED_IMAGE_TAG_EXPORTED'~g' \
-                                    -e 's~namespace:\s*petclinic~namespace: '$SED_TARGET_NAMESPACE_EXPORTED'~g' > manifest_temp.yaml
+                                    -e 's~namespace:\s*petclinic~namespace: '$SED_TARGET_NAMESPACE_EXPORTED'~g' \
+                                    > manifest_temp.yaml
                                 
                                 echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
                                 cat manifest_temp.yaml
                                 echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
                                 
-                                kubectl apply -n "${shellTargetNamespace}" -f manifest_temp.yaml
+                                kubectl apply -n "$SED_TARGET_NAMESPACE_EXPORTED" -f manifest_temp.yaml
                                 set +x
                             /$
                             
@@ -133,14 +126,15 @@ pipeline {
                     
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
-                        def shellTargetNamespaceForNodePort = params.TARGET_NAMESPACE
+                        def groovyTargetNamespaceForNodePort = params.TARGET_NAMESPACE
                         sh $/
                             set -x
-                            export SED_TARGET_NAMESPACE_NODEPORT_EXPORTED="${shellTargetNamespaceForNodePort}"
+                            export SED_TARGET_NAMESPACE_NODEPORT_EXPORTED="${groovyTargetNamespaceForNodePort}"
                             cat "${apiGatewayNodePortManifest}" | \
-                            sed -e 's~namespace:\s*petclinic~namespace: '$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED'~g' > nodeport_temp.yaml
+                            sed -e 's~namespace:\s*petclinic~namespace: '$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED'~g' \
+                                > nodeport_temp.yaml
                             
-                            kubectl apply -n "${shellTargetNamespaceForNodePort}" -f nodeport_temp.yaml
+                            kubectl apply -n "$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED" -f nodeport_temp.yaml
                             set +x
                         /$
                     } else {
