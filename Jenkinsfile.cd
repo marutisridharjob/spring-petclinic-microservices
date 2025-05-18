@@ -99,31 +99,26 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
                             
-                            // Truyền giá trị vào shell script thông qua biến môi trường của shell
-                            // Đặt tên biến môi trường cho shell một cách rõ ràng
-                            def shellDockerHubUsername = env.DOCKER_HUB_USERNAME
-                            def shellImageTag = imageTag
-                            def shellTargetNamespace = params.TARGET_NAMESPACE
-                        
-                            sh """
-                            set -x
-                            # Xuất các biến để sed có thể sử dụng chúng
-                            export SED_DOCKER_HUB_USERNAME="${shellDocker_HUB_USERNAME}"
-                            export SED_IMAGE_TAG="${shellImageTag}"
-                            export SED_TARGET_NAMESPACE="${shellTargetNamespace}"
+                            // Use dollar-slashy string to avoid escaping issues
+                            sh $/
+                                set -x
+                                # Export variables for sed
+                                export SED_DOCKER_HUB_USERNAME="${DOCKER_HUB_USERNAME}"
+                                export SED_IMAGE_TAG="${imageTag}"
+                                export SED_TARGET_NAMESPACE="${params.TARGET_NAMESPACE}"
 
-                            cat "${manifestFile}" | \\
-                            sed -e 's~\\$\\{DOCKER_HUB_USERNAME\\}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \\
-                                -e 's~\\$\\{TAG\\}~'"\${SED_IMAGE_TAG}"'~g' \\
-                                -e 's~namespace:\\s*petclinic~namespace: '"\${SED_TARGET_NAMESPACE}"'~g' > manifest_temp.yaml
-
-                            echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
-                            cat manifest_temp.yaml
-                            echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
-
-                            kubectl apply -n "${params.TARGET_NAMESPACE}" -f manifest_temp.yaml
-                            set +x
-                            """
+                                cat "${manifestFile}" | \
+                                sed -e 's~\${DOCKER_HUB_USERNAME}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \
+                                    -e 's~\${TAG}~'"\${SED_IMAGE_TAG}"'~g' \
+                                    -e 's~namespace:\\s*petclinic~namespace: '\${SED_TARGET_NAMESPACE}'~g' > manifest_temp.yaml
+                                
+                                echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
+                                cat manifest_temp.yaml
+                                echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
+                                
+                                kubectl apply -n "${params.TARGET_NAMESPACE}" -f manifest_temp.yaml
+                                set +x
+                            /$
                             
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
                                 echo "Waiting for ${serviceKey} to stabilize..."
@@ -136,21 +131,19 @@ pipeline {
                         }
                     }
                     
-                    // Cũng áp dụng cách tiếp cận tương tự cho API Gateway NodePort
+                    // API Gateway NodePort
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
-                        def sedExprNodeportNamespace = 's~namespace:\\s*petclinic~namespace: ' + "${params.TARGET_NAMESPACE}" + '~g'
-                        
                         sh """
                         cat ${apiGatewayNodePortManifest} | \
-                        sed -e "${sedExprNodeportNamespace}" > nodeport_temp.yaml
+                        sed -e 's~namespace:\\s*petclinic~namespace: ${params.TARGET_NAMESPACE}~g' > nodeport_temp.yaml
                         kubectl apply -n ${params.TARGET_NAMESPACE} -f nodeport_temp.yaml
                         """
                     } else {
                         echo "Warning: API Gateway NodePort manifest ${apiGatewayNodePortManifest} not found."
                     }
 
-                    def workerNodeIP = sh(script: 'kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o jsonpath="{.items[0].status.addresses[?(@.type==\\"InternalIP\\")].address}"', returnStdout: true).trim()
+                    def workerNodeIP = sh(script: 'kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o jsonpath=\'{.items[0].status.addresses[?(@.type=="InternalIP")].address}\'', returnStdout: true).trim()
                     def nodePort = sh(script: "kubectl get svc api-gateway-nodeport -n ${params.TARGET_NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}'", returnStdout: true).trim()
 
                     if (workerNodeIP.isEmpty() || nodePort.isEmpty()) {
