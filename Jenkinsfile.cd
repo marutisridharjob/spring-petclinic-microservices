@@ -107,7 +107,6 @@ pipeline {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
                             sh $/                            
                                 set -x
-                                # Export variables for sed, ensuring they are quoted for shell safety
                                 export SED_DOCKER_HUB_USERNAME="${DOCKER_HUB_CREDS_USR}"
                                 export SED_IMAGE_TAG="${currentImageTag}"
                                 export SED_TARGET_NAMESPACE="${params.TARGET_NAMESPACE}"
