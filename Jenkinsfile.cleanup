@@ -1,0 +1,22 @@
+pipeline {
+    agent any
+    parameters {
+        string(name: 'NAMESPACE_TO_DELETE', defaultValue: 'petclinic-devtest', description: 'Kubernetes namespace to delete.')
+    }
+    stages {
+        stage('Cleanup Kubernetes Deployment') {
+            steps {
+                script {
+                    echo "Attempting to delete namespace: ${params.NAMESPACE_TO_DELETE}"
+                    sh "kubectl delete namespace \"${params.NAMESPACE_TO_DELETE}\" --ignore-not-found=true --wait=true" 
+                    echo "Namespace ${params.NAMESPACE_TO_DELETE} delete command issued."
+                }
+            }
+        }
+    }
+    post {
+        always {
+            echo "Cleanup pipeline finished."
+        }
+    }
+}
