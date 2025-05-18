@@ -125,12 +125,18 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
                             // Sử dụng cú pháp sed cải tiến với -e và dấu phân cách ~
+                            echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
+                            echo "DEBUG: DOCKER_HUB_USERNAME for sed: ${env.DOCKER_HUB_USERNAME}" // DEBUG
+                            echo "DEBUG: imageTag for sed: ${imageTag}" // DEBUG
+                            echo "DEBUG: TARGET_NAMESPACE for sed: ${params.TARGET_NAMESPACE}" // DEBUG
                             sh """
+                            set -x
                             cat ${manifestFile} | \
                             sed -e "s~\\\${DOCKER_HUB_USERNAME}~${env.DOCKER_HUB_USERNAME}~g" \
                                 -e "s~\\\${TAG}~${imageTag}~g" \
                                 -e "s~namespace: petclinic~namespace: ${params.TARGET_NAMESPACE}~g" | \
                             kubectl apply -n ${params.TARGET_NAMESPACE} -f -
+                            set +x
                             """
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
                                 echo "Waiting for ${serviceKey} to stabilize..."
