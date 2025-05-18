@@ -99,22 +99,30 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${imageTag} for service ${serviceKey}..."
                             
-                            // Tạo các biểu thức sed một cách an toàn
-                            def sedExprUsername = 's~${DOCKER_HUB_USERNAME}~' + "${env.DOCKER_HUB_USERNAME}" + '~g'
-                            def sedExprTag = 's~${TAG}~' + "${imageTag}" + '~g'
-                            def sedExprNamespace = 's~namespace: petclinic~namespace: ' + "${params.TARGET_NAMESPACE}" + '~g'
-
+                            // Truyền giá trị vào shell script thông qua biến môi trường của shell
+                            // Đặt tên biến môi trường cho shell một cách rõ ràng
+                            def shellDockerHubUsername = env.DOCKER_HUB_USERNAME
+                            def shellImageTag = imageTag
+                            def shellTargetNamespace = params.TARGET_NAMESPACE
+                        
                             sh """
+                            set -x
+                            # Xuất các biến để sed có thể sử dụng chúng
+                            export SED_DOCKER_HUB_USERNAME="${shellDockerHubUsername}"
+                            export SED_IMAGE_TAG="${shellImageTag}"
+                            export SED_TARGET_NAMESPACE="${shellTargetNamespace}"
+                        
                             cat "${manifestFile}" | \
-                            sed -e "${sedExprUsername}" \
-                                -e "${sedExprTag}" \
-                                -e "${sedExprNamespace}" > manifest_temp.yaml
+                            sed -e 's~\${\s*DOCKER_HUB_USERNAME\s*}~'"\${SED_DOCKER_HUB_USERNAME}"'~g' \
+                                -e 's~\${\s*TAG\s*}~'"\${SED_IMAGE_TAG}"'~g' \
+                                -e 's~namespace:\s*petclinic~namespace: '"\${SED_TARGET_NAMESPACE}"'~g' > manifest_temp.yaml
                             
-                            echo "--- PROCESSED MANIFEST for ${serviceKey} ---"
+                            echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
                             cat manifest_temp.yaml
-                            echo "--- END PROCESSED MANIFEST ---"
+                            echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
                             
                             kubectl apply -n "${params.TARGET_NAMESPACE}" -f manifest_temp.yaml
+                            set +x
                             """
                             
                             if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
