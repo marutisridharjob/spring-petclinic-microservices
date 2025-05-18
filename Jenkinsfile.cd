@@ -70,7 +70,6 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-
                     sh "kubectl create namespace \"${params.TARGET_NAMESPACE}\" --dry-run=client -o yaml | kubectl apply -f -"
                     
                     def manifestFiles = [
@@ -91,35 +90,28 @@ pipeline {
                         if (fileExists(manifestFile)) {
                             echo "Deploying ${manifestFile} with image tag ${currentImageTag} for service ${serviceKey}..."
                             
-                            def groovyDockerHubUsername = DOCKER_HUB_CREDS_USR 
-                            def groovyImageTag = currentImageTag 
-                            def groovyTargetNamespace = params.TARGET_NAMESPACE 
-
-                            // Xây dựng các biểu thức sed một cách chính xác
-                            // Placeholder trong YAML là ${VAR}
-                            // Pattern sed cần tìm là \${VAR}
-                            // Chuỗi Groovy để tạo ra \${VAR} cho sed là "\\\$\{VAR\\}"
+                            sh """ 
+                                 set -x 
+                                 export SED_DOCKER_HUB_USERNAME_EXPORTED="${DOCKER_HUB_CREDS_USR}" 
+                                 export SED_IMAGE_TAG_EXPORTED="${currentImageTag}" 
+                                 export SED_TARGET_NAMESPACE_EXPORTED="${params.TARGET_NAMESPACE}" 
+ 
+                                 cat "${manifestFile}" | \
+                                 sed \
+                                     -e 's~\\\$\\{\\s*DOCKER_HUB_USERNAME\\s*\\}~'"\$SED_DOCKER_HUB_USERNAME_EXPORTED"'~g' \
+                                     -e 's~\\\$\\{\\s*TAG\\s*\\}~'"\$SED_IMAGE_TAG_EXPORTED"'~g' \
+                                     -e 's~namespace:\\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE_EXPORTED"'~g' \
+                                     > manifest_temp.yaml 
+                                 
+                                 echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---" 
+                                 cat manifest_temp.yaml 
+                                 echo "--- END PROCESSED MANIFEST (Jenkins Log) ---" 
+                                 
+                                 kubectl apply -n "\$SED_TARGET_NAMESPACE_EXPORTED" -f manifest_temp.yaml 
+                                 set +x 
+                             """ 
                             
-                            def sedExprUsername = "s~\\\$\{DOCKER_HUB_USERNAME\\}~${groovyDockerHubUsername}~g"
-                            def sedExprTag = "s~\\\$\{TAG\\}~${groovyImageTag}~g"
-                            def sedExprNamespace = "s~namespace:\\s*petclinic~${groovyTargetNamespace}~g"
-
-
-                            // Truyền các lệnh sed này vào shell
-                            sh """
-                                set -x
-                                cat "${manifestFile}" | \
-                                sed -e "${sedExprUsername}" -e "${sedExprTag}" -e "${sedExprNamespace}" > manifest_temp.yaml
-                                
-                                echo "--- PROCESSED MANIFEST for ${serviceKey} (Jenkins Log) ---"
-                                cat manifest_temp.yaml
-                                echo "--- END PROCESSED MANIFEST (Jenkins Log) ---"
-                                
-                                kubectl apply -n "${groovyTargetNamespace}" -f manifest_temp.yaml
-                                set +x
-                            """
-                            
-                            if (serviceKey == 'discovery-server' || serviceKey == 'config-server') {
+                            if (serviceKey == 'discovery-server' || serviceKey == 'config-server') { 
                                 echo "Waiting for ${serviceKey} to stabilize..."
                                 sh "sleep 30"
                             } else {
@@ -132,16 +124,16 @@ pipeline {
                     
                     def apiGatewayNodePortManifest = "k8s/api-gateway-nodeport.yaml"
                     if (fileExists(apiGatewayNodePortManifest)) {
-                        def groovyTargetNamespaceForNodePort = params.TARGET_NAMESPACE
-                        def sedCmdNodeportNamespace = "s~namespace:\\s*petclinic~namespace: ${groovyTargetNamespaceForNodePort}~g"
-                        sh """
-                            set -x
-                            cat "${apiGatewayNodePortManifest}" | \\
-                            sed -e "${sedCmdNodeportNamespace}" > nodeport_temp.yaml
-                            
-                            kubectl apply -n "${groovyTargetNamespaceForNodePort}" -f nodeport_temp.yaml
-                            set +x
-                        """
+                        sh """ 
+                             set -x 
+                             export SED_TARGET_NAMESPACE_NODEPORT_EXPORTED="${params.TARGET_NAMESPACE}" 
+                             cat "${apiGatewayNodePortManifest}" | \
+                             sed -e 's~namespace:\\s*petclinic~namespace: '"\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED"'~g' \
+                                 > nodeport_temp.yaml 
+                             
+                             kubectl apply -n "\$SED_TARGET_NAMESPACE_NODEPORT_EXPORTED" -f nodeport_temp.yaml 
+                             set +x 
+                         """ 
                     } else {
                         echo "Warning: API Gateway NodePort manifest ${apiGatewayNodePortManifest} not found."
                     }
