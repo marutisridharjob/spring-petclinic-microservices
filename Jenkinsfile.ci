@@ -2,12 +2,12 @@ pipeline {
     agent any
     
     parameters {
-        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build' )
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build')
     }
     
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub')
-        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}"
+        DOCKER_HUB_USERNAME = "${DOCKER_HUB_CREDS_USR}" // Using Groovy GString for consistency
         COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
     
@@ -16,31 +16,72 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM', 
                     branches: [[name: "${params.BRANCH_NAME}"]], 
-                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02']]
-                ] )
+                    userRemoteConfigs: [[url: 'https://github.com/OpsInUs/Petclinic-02.git']]
+                ])
             }
         }
         
         stage('Build') {
             steps {
                 sh './mvnw clean package -DskipTests'
+                
+                // --- DEBUGGING - You can remove or comment this out after it works ---
+                sh 'echo "--- Listing workspace root after Maven build ---"'
+                sh 'ls -l'
+                sh 'echo "--- Listing spring-petclinic-admin-server directory after Maven build ---"'
+                sh 'ls -l spring-petclinic-admin-server' // Corrected name
+                sh 'echo "--- Listing spring-petclinic-admin-server/target directory after Maven build (if it exists) ---"'
+                sh 'ls -lR spring-petclinic-admin-server/target || echo "spring-petclinic-admin-server/target not found or empty after build stage"'
+                // --- END DEBUGGING --- 
             }
         }
         
         stage('Build and Push Docker Images') {
             steps {
                 script {
-                    def services = ['admin-server', 'api-gateway', 'customers-service', 'discovery-server', 'vets-service', 'visits-service', 'genai-service','config-server']
+                    def services = [
+                        'spring-petclinic-admin-server',
+                        'spring-petclinic-api-gateway',
+                        'spring-petclinic-customers-service',
+                        'spring-petclinic-discovery-server',
+                        'spring-petclinic-vets-service',
+                        'spring-petclinic-visits-service',
+                        'spring-petclinic-genai-service'
+                        // Add spring-petclinic-config-server if needed
+                    ]
                     
-                    services.each { service ->
-                        dir(service) {
-                            sh """
+                    services.each { serviceDirName ->
+                        dir(serviceDirName) {
+                            echo "Current directory inside loop: ${pwd()} for service ${serviceDirName}"
+                            sh 'ls -la target || echo "Target directory does not exist here or is empty for ${serviceDirName}."'
+
+                            def artifactRelativePath = sh(script: "find target -maxdepth 1 -name '*.jar' -print -quit", returnStdout: true).trim()
+                            if (artifactRelativePath.isEmpty()) {
+                                error("No JAR file found in target/ for service ${serviceDirName}. Current dir: ${pwd()}")
+                            }
+                            
+                            echo "DEBUG: serviceDirName = '${serviceDirName}'"
+                            echo "DEBUG: artifactRelativePath = '${artifactRelativePath}'" // Will be "target/service-version.jar"
+                            
+                            def dockerImageServiceName = serviceDirName.replace('spring-petclinic-', '')
+                            echo "DEBUG: dockerImageServiceName = '${dockerImageServiceName}'"
+                            echo "DEBUG: DOCKER_HUB_USERNAME = '${DOCKER_HUB_USERNAME}'"
+                            echo "DEBUG: COMMIT_ID = '${COMMIT_ID}'"
+                            echo "DEBUG: Full Docker Tag will be: '${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}'"
+
+                            sh """ 
+                            echo "--- Docker Build Step ---" 
+                            echo "Service Directory Name: ${serviceDirName}" 
+                            echo "Artifact Relative Path for build-arg: ${artifactRelativePath}" 
+                            echo "Commit ID: \${COMMIT_ID}" 
+                            echo "Docker Hub Username: \${DOCKER_HUB_USERNAME}" 
+                            echo "--------------------------" 
                             cp ../docker/Dockerfile .
-                            docker build -t ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID} .
-                            docker tag ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID} ${DOCKER_HUB_USERNAME}/petclinic-${service}:latest
-                            echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin
-                            docker push ${DOCKER_HUB_USERNAME}/petclinic-${service}:${COMMIT_ID}
-                            docker push ${DOCKER_HUB_USERNAME}/petclinic-${service}:latest
+                            docker build --build-arg ARTIFACT_PATH="${artifactRelativePath}" -t "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}" .
+                            docker tag "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}" "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
+                            echo \${DOCKER_HUB_CREDS_PSW} | docker login -u \${DOCKER_HUB_USERNAME} --password-stdin
+                            docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:${COMMIT_ID}"
+                            docker push "${DOCKER_HUB_USERNAME}/petclinic-${dockerImageServiceName}:latest"
                             """
                         }
                     }
