@@ -99,12 +99,11 @@ pipeline {
                     if (affectedServices.isEmpty()) {
                         echo "No valid service changes detected. Skipping pipeline."
                         env.AFFECTED_SERVICES = ''
-                        currentBuild.result = 'SUCCESS'
                         return
                     }
 
-                    // Store affected services as a space-delimited string
                     def servicesString = affectedServices.join(' ')
+                    echo "ENV_AFFECTED_SERVICES: [${env.AFFECTED_SERVICES}]"
                     env.AFFECTED_SERVICES = servicesString
                     env.CONTAINER_TAG = env.GIT_COMMIT?.substring(0, 7) ?: 'unknown'
                     echo "Changed services: ${servicesString}"
