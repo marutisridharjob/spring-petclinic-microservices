@@ -111,6 +111,13 @@ pipeline {
             }
         }
 
+        stage('Log Changes') {
+            steps {
+                echo "Final ENV_AFFECTED_SERVICES: [${env.AFFECTED_SERVICES}]"
+                echo "Final CONTAINER_TAG: [${env.CONTAINER_TAG}]"
+            }
+        }
+
         stage('Login to DockerHub') {
             when {
                 expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
