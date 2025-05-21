@@ -146,6 +146,7 @@ pipeline {
                             mvn clean install -P buildDocker -Dmaven.test.skip=true \
                                 -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \
                                 -Ddocker.image.tag=${CONTAINER_TAG}
+                            sh 'docker images'
                             docker push ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
                             echo "Docker image for ${service} with tag ${CONTAINER_TAG} pushed successfully"
                             cd ..
