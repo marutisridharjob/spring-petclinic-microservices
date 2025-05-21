@@ -57,11 +57,15 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
+                    def affectedServices = []
+
                     // Check for tag build first
                     if (env.TAG_NAME) {
                         echo "A new release found with tag ${env.TAG_NAME}"
-                        env.AFFECTED_SERVICES = affectedServices.join(' ').toString()
+                        affectedServices = VALID_SERVICES
+                        env.AFFECTED_SERVICES = affectedServices.join(' ')
                         env.CONTAINER_TAG = env.TAG_NAME
+                        echo "Changed services (tag): ${env.AFFECTED_SERVICES}"
                         return
                     }
 
@@ -83,8 +87,6 @@ pipeline {
                         return
                     }
 
-                    // Determine which services were affected by the changes
-                    def affectedServices = []
                     changedFiles.split("\n").each { file ->
                         VALID_SERVICES.each { service ->
                             if (file.startsWith("${service}/") && !affectedServices.contains(service)) {
@@ -101,14 +103,12 @@ pipeline {
                         return
                     }
 
-                    // Set environment variables
                     env.AFFECTED_SERVICES = affectedServices.join(' ')
                     env.CONTAINER_TAG = env.GIT_COMMIT?.substring(0, 7) ?: 'unknown'
                     echo "Changed services: ${env.AFFECTED_SERVICES}"
                 }
             }
         }
-
 
         stage('Login to DockerHub') {
             when {
