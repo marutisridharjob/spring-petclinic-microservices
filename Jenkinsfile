@@ -89,6 +89,7 @@ pipeline {
                         VALID_SERVICES.each { service ->
                             if (file.startsWith("${service}/") && !affectedServices.contains(service)) {
                                 affectedServices.add(service)
+                                echo "Detected changes in ${service}"
                             }
                         }
                     }
