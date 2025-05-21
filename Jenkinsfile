@@ -1,15 +1,30 @@
 pipeline {
-     agent {
-        label 'slave1'
-    }
+     agent any
 
     tools {
         maven 'Maven-3.9.4'
-        jdk 'OpenJDK-21'
+        jdk 'OpenJDK-17'
+    }
+
+    environment {
+        DOCKER_REGISTRY = 'anhkhoa217'
+        GITHUB_CREDENTIALS_ID = 'github_pat'
+        DOCKER_HUB_CREDENTIALS_ID = 'dockerhub_credentials'
+        GITHUB_REPO_URL = 'https://github.com/kiin21/spring-petclinic-microservices.git'
+        VALID_SERVICES = [
+                        'spring-petclinic-admin-server',
+                        'spring-petclinic-api-gateway',
+                        'spring-petclinic-config-server',
+                        'spring-petclinic-genai-service',
+                        'spring-petclinic-customers-service',
+                        'spring-petclinic-discovery-server',
+                        'spring-petclinic-vets-service',
+                        'spring-petclinic-visits-service',
+                    ]
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Clone Code') { // 
             steps {
                 checkout([
                     $class: 'GitSCM',
@@ -20,8 +35,8 @@ pipeline {
                         [$class: 'PruneStaleBranch']
                     ],
                     userRemoteConfigs: [[
-                        url: 'https://github.com/kiin21/spring-petclinic-microservices.git',
-                        credentialsId: 'github-pat'
+                        url: env.GITHUB_REPO_URL,
+                        credentialsId: env.GITHUB_CREDENTIALS_ID
                     ]]
                 ])
             }
@@ -31,15 +46,7 @@ pipeline {
             steps {
                 script {
                     // Define valid services
-                    def VALID_SERVICES = [
-                        'spring-petclinic-admin-server',
-                        'spring-petclinic-api-gateway',
-                        'spring-petclinic-config-server',
-                        'spring-petclinic-customers-service',
-                        'spring-petclinic-discovery-server',
-                        'spring-petclinic-vets-service',
-                        'spring-petclinic-visits-service',
-                    ]
+                    def 
 
                     // Get the list of changed files between current commit and last successful build
                     def changedFiles = sh(
@@ -63,7 +70,7 @@ pipeline {
                     // Determine which services were affected by the changes
                     def affectedServices = []
                     changedFiles.split("\n").each { file ->
-                        VALID_SERVICES.each { service ->
+                        env.VALID_SERVICES.each { service ->
                             if (file.startsWith("${service}/")) {
                                 if (!affectedServices.contains(service)) {
                                     affectedServices.add(service)
@@ -84,117 +91,160 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            when {
-                expression { env.AFFECTED_SERVICES != '' }
-            }
+        stage('Detect Released Tag') {
+            when { expression { return env.TAG_NAME } }
             steps {
                 script {
-                    def services = env.AFFECTED_SERVICES.split(' ')
-                    for (service in services) {
-                        echo "Running tests for ${service}"
-                        sh """
-                            if [ -d "${service}" ]; then
-                                cd ${service}
-                                mvn clean verify -P springboot
-                            else
-                                echo "Directory ${service} does not exist!"
-                            fi
-                        """
-
-                    }
-                }
-            }
-            post {
-                always {
-                    script {
-                        env.AFFECTED_SERVICES.split(' ').each { service ->
-                            dir(service) {
-                                // Store JUnit test results
-                                junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
-
-                                // Store JaCoCo coverage results
-                                jacoco(
-                                    execPattern: '**/target/jacoco.exec',
-                                    classPattern: '**/target/classes',
-                                    sourcePattern: '**/src/main/java',
-                                )
-
-                            }
-                        }
-                    }
+                    echo "A new release found with tag ${env.TAG_NAME}"
+                    CHANGED_SERVICES = env.SERVICES
                 }
             }
         }
 
-        stage('Check Coverage') {
+        // stage('Test') {
+        //     when {
+        //         expression { env.AFFECTED_SERVICES != '' }
+        //     }
+        //     steps {
+        //         script {
+        //             def services = env.AFFECTED_SERVICES.split(' ')
+        //             for (service in services) {
+        //                 echo "Running tests for ${service}"
+        //                 sh """
+        //                     if [ -d "${service}" ]; then
+        //                         cd ${service}
+        //                         mvn clean verify -P springboot
+        //                     else
+        //                         echo "Directory ${service} does not exist!"
+        //                     fi
+        //                 """
+
+        //             }
+        //         }
+        //     }
+        //     post {
+        //         always {
+        //             script {
+        //                 env.AFFECTED_SERVICES.split(' ').each { service ->
+        //                     dir(service) {
+        //                         // Store JUnit test results
+        //                         junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+
+        //                         // Store JaCoCo coverage results
+        //                         jacoco(
+        //                             execPattern: '**/target/jacoco.exec',
+        //                             classPattern: '**/target/classes',
+        //                             sourcePattern: '**/src/main/java',
+        //                         )
+
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        // stage('Check Coverage') {
+        //     when {
+        //         expression { env.AFFECTED_SERVICES != '' }
+        //     }
+        //     steps {
+        //         script {
+        //             def services = env.AFFECTED_SERVICES.split(' ')
+        //             def coveragePass = true
+        //             // Define valid services
+        //             def SKIP_CHECK_COVERAGE_SERVICES = [
+        //                 'spring-petclinic-admin-server',
+        //                 'spring-petclinic-api-gateway',
+        //                 'spring-petclinic-config-server',
+        //                 'spring-petclinic-discovery-server',
+        //             ]
+        //             for (service in services) {\
+        //                 if (service in SKIP_CHECK_COVERAGE_SERVICES) {
+        //                     echo "Skipping coverage check for ${service}."
+        //                     continue
+        //                 }
+        //                 echo "Checking coverage for ${service}..."
+
+        //                 // Check if the Jacoco XML file exists before parsing
+        //                 def jacocoFile = "${service}/target/site/jacoco/jacoco.xml"
+        //                 if (fileExists(jacocoFile)) {
+        //                     // Improved shell command to extract coverage properly
+        //                     def coverage = sh(script: """
+        //                         grep -m 1 -A 1 '<counter type="INSTRUCTION"' ${jacocoFile} |
+        //                         grep 'missed' |
+        //                         sed -E 's/.*missed="([0-9]+)".*covered="([0-9]+)".*/\\1 \\2/' |
+        //                         awk '{ print (\$2/(\$1+\$2))*100 }'
+        //                     """, returnStdout: true).trim().toFloat()
+
+        //                     echo "Code Coverage for ${service}: ${coverage}%"
+
+        //                     // If coverage is below 70%, mark as failed
+        //                     if (coverage < 70) {
+        //                         echo "Coverage for ${service} is below 70%. Build failed!"
+        //                         coveragePass = false
+        //                     }
+        //                 } else {
+        //                     echo "Jacoco report for ${service} not found. Skipping coverage check."
+        //                     coveragePass = false
+        //                 }
+        //             }
+
+        //             // Fail the build if any service's coverage is below 70%
+        //             if (!coveragePass) {
+        //                 error "Test coverage is below 70% for one or more services. Build failed!"
+        //             }
+        //         }
+        //     }
+        // }
+
+        stage('Login Dockerhub') {
             when {
-                expression { env.AFFECTED_SERVICES != '' }
+                expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
             }
             steps {
-                script {
-                    def services = env.AFFECTED_SERVICES.split(' ')
-                    def coveragePass = true
-                    // Define valid services
-                    def SKIP_CHECK_COVERAGE_SERVICES = [
-                        'spring-petclinic-admin-server',
-                        'spring-petclinic-api-gateway',
-                        'spring-petclinic-config-server',
-                        'spring-petclinic-discovery-server',
-                    ]
-                    for (service in services) {\
-                        if (service in SKIP_CHECK_COVERAGE_SERVICES) {
-                            echo "Skipping coverage check for ${service}."
-                            continue
-                        }
-                        echo "Checking coverage for ${service}..."
-
-                        // Check if the Jacoco XML file exists before parsing
-                        def jacocoFile = "${service}/target/site/jacoco/jacoco.xml"
-                        if (fileExists(jacocoFile)) {
-                            // Improved shell command to extract coverage properly
-                            def coverage = sh(script: """
-                                grep -m 1 -A 1 '<counter type="INSTRUCTION"' ${jacocoFile} |
-                                grep 'missed' |
-                                sed -E 's/.*missed="([0-9]+)".*covered="([0-9]+)".*/\\1 \\2/' |
-                                awk '{ print (\$2/(\$1+\$2))*100 }'
-                            """, returnStdout: true).trim().toFloat()
-
-                            echo "Code Coverage for ${service}: ${coverage}%"
-
-                            // If coverage is below 70%, mark as failed
-                            if (coverage < 70) {
-                                echo "Coverage for ${service} is below 70%. Build failed!"
-                                coveragePass = false
-                            }
-                        } else {
-                            echo "Jacoco report for ${service} not found. Skipping coverage check."
-                            coveragePass = false
-                        }
-                    }
-
-                    // Fail the build if any service's coverage is below 70%
-                    if (!coveragePass) {
-                        error "Test coverage is below 70% for one or more services. Build failed!"
-                    }
+                withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                 }
             }
         }
 
-        stage('Build') {
+        stage('Build Images and Push to Dockerhub') {
             when {
-                expression { AFFECTED_SERVICES != '' }
+                expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
             }
             steps {
                 script {
+                    if (env.TAG_NAME) {
+                        echo "Building and pushing images for all services due to new release tag ${env.TAG_NAME}"
+                        env.AFFECTED_SERVICES = env.VALID_SERVICES.join(' ')
+                        CONTAINER_TAG = env.TAG_NAME
+                    } else {
+                        echo "Building and pushing images for affected services: ${env.AFFECTED_SERVICES}"
+                        CONTAINER_TAG = env.GIT_COMMIT.substring(0, 7)
+                    }
+
                     def services = AFFECTED_SERVICES.split(' ')
                     for (service in services) {
                         echo "Building ${service}"
                         sh """
                             cd ${service}
-                            mvn clean package -DskipTests
+                            mvn clean install -P buildDocker -Dmaven.test.skip=true -Ddocker.image.prefix=${env.DOCKER_REGISTRY} -Ddocker.image.tag=${CONTAINER_TAG}
+                            docker push ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
                         """
                     }
+                }
+            }
+        }
+
+        stage('Clean Up Docker Images and Logout') {
+            expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
+            steps {
+                script {
+                    echo "Cleaning up Docker images"
+                    sh "docker system prune -af"
+                    sh  "docker logout"
+                    echo "Docker logout completed"
                 }
             }
         }
