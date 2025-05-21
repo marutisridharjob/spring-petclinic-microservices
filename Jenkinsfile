@@ -126,11 +126,11 @@ pipeline {
             steps {
                 script {
                     if (env.TAG_NAME) {
-                        CONTAINER_TAG = env.TAG_NAME
+                        def CONTAINER_TAG = env.TAG_NAME
                         echo "Building all services for tag: ${CONTAINER_TAG}"
                     }
                     else {
-                        CONTAINER_TAG = "${env.GIT_COMMIT.take(7)}"
+                        def CONTAINER_TAG = "${env.GIT_COMMIT.take(7)}"
                         echo "Building all services for commit: ${CONTAINER_TAG}"
                     }
 
@@ -146,7 +146,7 @@ pipeline {
                             mvn clean install -P buildDocker -Dmaven.test.skip=true \
                                 -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \
                                 -Ddocker.image.tag=${CONTAINER_TAG}
-                            sh 'docker images'
+                            sh 'sudo docker images'
                             docker push ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
                             echo "Docker image for ${service} with tag ${CONTAINER_TAG} pushed successfully"
                             cd ..
