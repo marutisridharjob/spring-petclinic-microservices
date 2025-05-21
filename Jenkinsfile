@@ -64,7 +64,7 @@ pipeline {
                         env.CONTAINER_TAG = env.TAG_NAME
                         return
                     }
-                    
+
                     // Regular build with change detection
                     def changedFiles = sh(
                         script: """
@@ -94,20 +94,21 @@ pipeline {
                         }
                     }
 
-                    env.AFFECTED_SERVICES = "${affectedServices.join(' ')}"
-                    
-                    // Set the container tag to the commit hash (short version)
-                    env.CONTAINER_TAG = env.GIT_COMMIT.substring(0, 7)
-
-                    if (!env.AFFECTED_SERVICES || env.AFFECTED_SERVICES.trim().isEmpty()) {
+                    if (affectedServices.isEmpty()) {
                         echo "No valid service changes detected. Skipping pipeline."
+                        env.AFFECTED_SERVICES = ''
                         currentBuild.result = 'SUCCESS'
-                    } else {
-                        echo "Changed services: ${env.AFFECTED_SERVICES}"
+                        return
                     }
+
+                    // Set environment variables
+                    env.AFFECTED_SERVICES = affectedServices.join(' ')
+                    env.CONTAINER_TAG = env.GIT_COMMIT?.substring(0, 7) ?: 'unknown'
+                    echo "Changed services: ${env.AFFECTED_SERVICES}"
                 }
             }
         }
+
 
         stage('Login to DockerHub') {
             when {
