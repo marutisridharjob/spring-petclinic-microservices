@@ -8,6 +8,7 @@ def VALID_SERVICES = [
     'spring-petclinic-vets-service',
     'spring-petclinic-visits-service',
 ]
+def AFFECTED_SERVICES = ''
 
 pipeline {
     agent any
@@ -22,8 +23,6 @@ pipeline {
         GITHUB_CREDENTIALS_ID = 'github_pat'
         DOCKER_HUB_CREDENTIALS_ID = 'dockerhub_credentials'
         GITHUB_REPO_URL = 'https://github.com/kiin21/spring-petclinic-microservices.git'
-        AFFECTED_SERVICES = ''
-        CONTAINER_TAG = ''
     }
 
     stages {
@@ -60,12 +59,11 @@ pipeline {
                     def affectedServices = []
 
                     // Check for tag build first
-                    if (env.TAG_NAME) {
+                    if (env.TAG_NAME) { // If a tag is present, we assume all services are affected
                         echo "A new release found with tag ${env.TAG_NAME}"
                         affectedServices = VALID_SERVICES
-                        env.AFFECTED_SERVICES = affectedServices.join(' ')
-                        env.CONTAINER_TAG = env.TAG_NAME
-                        echo "Changed services (tag): ${env.AFFECTED_SERVICES}"
+                        AFFECTED_SERVICES = affectedServices.join(' ')
+                        echo "Changed services (tag): ${AFFECTED_SERVICES}"
                         return
                     }
 
@@ -83,7 +81,7 @@ pipeline {
 
                     if (changedFiles == null || changedFiles.trim().isEmpty()) {
                         echo "No changes detected."
-                        env.AFFECTED_SERVICES = ''
+                        AFFECTED_SERVICES = ''
                         return
                     }
 
@@ -98,29 +96,21 @@ pipeline {
 
                     if (affectedServices.isEmpty()) {
                         echo "No valid service changes detected. Skipping pipeline."
-                        env.AFFECTED_SERVICES = ''
+                        AFFECTED_SERVICES = ''
                         return
                     }
 
                     def servicesString = affectedServices.join(' ')
-                    env.AFFECTED_SERVICES = servicesString
-                    env.CONTAINER_TAG = env.GIT_COMMIT?.substring(0, 7) ?: 'unknown'
-                    echo "ENV_AFFECTED_SERVICES: [${env.AFFECTED_SERVICES}]"
+                    AFFECTED_SERVICES = servicesString
+                    echo "ENV_AFFECTED_SERVICES: [${AFFECTED_SERVICES}]"
                     echo "Changed services: ${servicesString}"
                 }
             }
         }
 
-        stage('Log Changes') {
-            steps {
-                echo "Final ENV_AFFECTED_SERVICES: [${env.AFFECTED_SERVICES}]"
-                echo "Final CONTAINER_TAG: [${env.CONTAINER_TAG}]"
-            }
-        }
-
         stage('Login to DockerHub') {
             when {
-                expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
+                expression { return AFFECTED_SERVICES != '' || env.TAG_NAME != null }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -131,21 +121,24 @@ pipeline {
 
         stage('Build and Push Docker Images') {
             when {
-                expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
+                expression { return AFFECTED_SERVICES != '' || env.TAG_NAME != null }
             }
             steps {
                 script {
-                    echo "Building images for services: ${env.AFFECTED_SERVICES}"
+                    if (env.TAG_NAME) {
+                        CONTAINER_TAG = env.TAG_NAME
+                        echo "Building all services for tag: ${CONTAINER_TAG}"
+                    }
+                    else {
+                        CONTAINER_TAG = "${env.GIT_COMMIT.take(7)}"
+                        echo "Building all services for commit: ${CONTAINER_TAG}"
+                    }
+
+                    echo "Building images for services: ${AFFECTED_SERVICES}"
                     
                     // Split the string into an array
-                    def services = env.AFFECTED_SERVICES.split(' ')
-                    
-                    // Double check that we have a valid container tag
-                    if (!env.CONTAINER_TAG) {
-                        env.CONTAINER_TAG = env.GIT_COMMIT.substring(0, 7)
-                        echo "Using commit hash as container tag: ${env.CONTAINER_TAG}"
-                    }
-                    
+                    def services = AFFECTED_SERVICES.split(' ')
+                                      
                     for (service in services) {
                         echo "Building and pushing Docker image for ${service}"
                         sh """
@@ -154,6 +147,7 @@ pipeline {
                                 -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \
                                 -Ddocker.image.tag=${env.CONTAINER_TAG}
                             docker push ${env.DOCKER_REGISTRY}/${service}:${env.CONTAINER_TAG}
+                            echo "Docker image for ${service} with tag ${env.CONTAINER_TAG} pushed successfully"
                             cd ..
                         """
                     }
@@ -163,7 +157,7 @@ pipeline {
 
         stage('Clean Up') {
             when {
-                expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
+                expression { return AFFECTED_SERVICES != '' || env.TAG_NAME != null }
             }
             steps {
                 sh "docker system prune -af"
@@ -177,46 +171,6 @@ pipeline {
         always {
             cleanWs()
             echo "Workspace cleaned"
-        }
-        success {
-            echo "Pipeline completed successfully"
-            script {
-                // Only update GitHub status if we have commit information
-                if (env.GIT_COMMIT) {
-                    try {
-                        step([
-                            $class: 'GitHubCommitStatusSetter',
-                            commitShaSource: [$class: 'ManuallyEnteredShaSource', sha: env.GIT_COMMIT],
-                            contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: 'ci/jenkins/build-status'],
-                            statusResultSource: [$class: 'ConditionalStatusResultSource', results: [
-                                [$class: 'AnyBuildResult', message: 'Pipeline completed successfully', state: 'SUCCESS']
-                            ]]
-                        ])
-                    } catch (Exception e) {
-                        echo "Failed to set GitHub commit status: ${e.getMessage()}"
-                    }
-                }
-            }
-        }
-        failure {
-            echo "Pipeline failed"
-            script {
-                // Only update GitHub status if we have commit information
-                if (env.GIT_COMMIT) {
-                    try {
-                        step([
-                            $class: 'GitHubCommitStatusSetter',
-                            commitShaSource: [$class: 'ManuallyEnteredShaSource', sha: env.GIT_COMMIT],
-                            contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: 'ci/jenkins/build-status'],
-                            statusResultSource: [$class: 'ConditionalStatusResultSource', results: [
-                                [$class: 'AnyBuildResult', message: 'Pipeline failed', state: 'FAILURE']
-                            ]]
-                        ])
-                    } catch (Exception e) {
-                        echo "Failed to set GitHub commit status: ${e.getMessage()}"
-                    }
-                }
-            }
         }
     }
 }
