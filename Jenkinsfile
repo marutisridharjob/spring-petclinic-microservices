@@ -103,9 +103,9 @@ pipeline {
                     }
 
                     def servicesString = affectedServices.join(' ')
-                    echo "ENV_AFFECTED_SERVICES: [${env.AFFECTED_SERVICES}]"
                     env.AFFECTED_SERVICES = servicesString
                     env.CONTAINER_TAG = env.GIT_COMMIT?.substring(0, 7) ?: 'unknown'
+                    echo "ENV_AFFECTED_SERVICES: [${env.AFFECTED_SERVICES}]"
                     echo "Changed services: ${servicesString}"
                 }
             }
