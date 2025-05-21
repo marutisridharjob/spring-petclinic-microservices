@@ -1,3 +1,14 @@
+def VALID_SERVICES = [
+    'spring-petclinic-admin-server',
+    'spring-petclinic-api-gateway',
+    'spring-petclinic-config-server',
+    'spring-petclinic-genai-service',
+    'spring-petclinic-customers-service',
+    'spring-petclinic-discovery-server',
+    'spring-petclinic-vets-service',
+    'spring-petclinic-visits-service',
+]
+
 pipeline {
      agent any
 
@@ -11,16 +22,6 @@ pipeline {
         GITHUB_CREDENTIALS_ID = 'github_pat'
         DOCKER_HUB_CREDENTIALS_ID = 'dockerhub_credentials'
         GITHUB_REPO_URL = 'https://github.com/kiin21/spring-petclinic-microservices.git'
-        VALID_SERVICES = [
-                        'spring-petclinic-admin-server',
-                        'spring-petclinic-api-gateway',
-                        'spring-petclinic-config-server',
-                        'spring-petclinic-genai-service',
-                        'spring-petclinic-customers-service',
-                        'spring-petclinic-discovery-server',
-                        'spring-petclinic-vets-service',
-                        'spring-petclinic-visits-service',
-                    ]
     }
 
     stages {
@@ -206,51 +207,47 @@ pipeline {
             }
         }
 
-        stage('Build Images and Push to Dockerhub') {
+        stage('Build and Push Docker Images') {
             when {
-                expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
+                expression { return env.AFFECTED_SERVICES != '' }
             }
             steps {
                 script {
-                    if (env.TAG_NAME) {
-                        echo "Building and pushing images for all services due to new release tag ${env.TAG_NAME}"
-                        env.AFFECTED_SERVICES = env.VALID_SERVICES.join(' ')
-                        CONTAINER_TAG = env.TAG_NAME
-                    } else {
-                        echo "Building and pushing images for affected services: ${env.AFFECTED_SERVICES}"
-                        CONTAINER_TAG = env.GIT_COMMIT.substring(0, 7)
-                    }
-
-                    def services = AFFECTED_SERVICES.split(' ')
+                    def services = env.AFFECTED_SERVICES.split(' ')
                     for (service in services) {
-                        echo "Building ${service}"
+                        echo "Building and pushing Docker image for ${service}"
                         sh """
                             cd ${service}
-                            mvn clean install -P buildDocker -Dmaven.test.skip=true -Ddocker.image.prefix=${env.DOCKER_REGISTRY} -Ddocker.image.tag=${CONTAINER_TAG}
-                            docker push ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
+                            mvn clean install -P buildDocker -Dmaven.test.skip=true \
+                                -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \
+                                -Ddocker.image.tag=${env.CONTAINER_TAG}
+                            docker push ${env.DOCKER_REGISTRY}/${service}:${env.CONTAINER_TAG}
+                            cd ..
                         """
                     }
                 }
             }
         }
 
-        stage('Clean Up Docker Images and Logout') {
+        stage('Clean Up') {
             when {
-                expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
+                expression { return env.AFFECTED_SERVICES != '' }
             }
             steps {
-                script {
-                    echo "Cleaning up Docker images"
-                    sh "docker system prune -af"
-                    sh  "docker logout"
-                    echo "Docker logout completed"
-                }
+                sh "docker system prune -af"
+                sh "docker logout"
+                echo "Docker cleanup and logout completed"
             }
         }
     }
 
     post {
+        always {
+            cleanWs()
+            echo "Workspace cleaned"
+        }
         success {
+            echo "Pipeline completed successfully"
             step([
                 $class: 'GitHubCommitStatusSetter',
                 statusResultSource: [
@@ -259,6 +256,7 @@ pipeline {
             ])
         }
         failure {
+            echo "Pipeline failed"
             step([
                 $class: 'GitHubCommitStatusSetter',
                 statusResultSource: [
