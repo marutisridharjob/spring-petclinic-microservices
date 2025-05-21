@@ -98,7 +98,7 @@ pipeline {
                     // Set the container tag to the commit hash (short version)
                     env.CONTAINER_TAG = env.GIT_COMMIT.substring(0, 7)
 
-                    if (env.AFFECTED_SERVICES.isEmpty()) {
+                    if (!env.AFFECTED_SERVICES || env.AFFECTED_SERVICES.trim().isEmpty()) {
                         echo "No valid service changes detected. Skipping pipeline."
                         currentBuild.result = 'SUCCESS'
                     } else {
