@@ -60,7 +60,7 @@ pipeline {
                     // Check for tag build first
                     if (env.TAG_NAME) {
                         echo "A new release found with tag ${env.TAG_NAME}"
-                        env.AFFECTED_SERVICES = VALID_SERVICES.join(' ')
+                        env.AFFECTED_SERVICES = affectedServices.join(' ').toString()
                         env.CONTAINER_TAG = env.TAG_NAME
                         return
                     }
