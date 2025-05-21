@@ -235,7 +235,9 @@ pipeline {
         }
 
         stage('Clean Up Docker Images and Logout') {
-            expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
+            when {
+                expression { AFFECTED_SERVICES != '' || env.TAG_NAME }
+            }
             steps {
                 script {
                     echo "Cleaning up Docker images"
