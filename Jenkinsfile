@@ -81,7 +81,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    if (changedFiles.isEmpty()) {
+                    if (changedFiles == null || changedFiles.trim().isEmpty()) {
                         echo "No changes detected."
                         env.AFFECTED_SERVICES = ''
                         return
@@ -103,16 +103,18 @@ pipeline {
                         return
                     }
 
-                    env.AFFECTED_SERVICES = affectedServices.join(' ')
+                    // Store affected services as a space-delimited string
+                    def servicesString = affectedServices.join(' ')
+                    env.AFFECTED_SERVICES = servicesString
                     env.CONTAINER_TAG = env.GIT_COMMIT?.substring(0, 7) ?: 'unknown'
-                    echo "Changed services: ${env.AFFECTED_SERVICES}"
+                    echo "Changed services: ${servicesString}"
                 }
             }
         }
 
         stage('Login to DockerHub') {
             when {
-                expression { return env.AFFECTED_SERVICES != '' }
+                expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -123,10 +125,13 @@ pipeline {
 
         stage('Build and Push Docker Images') {
             when {
-                expression { return env.AFFECTED_SERVICES != '' }
+                expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
             }
             steps {
                 script {
+                    echo "Building images for services: ${env.AFFECTED_SERVICES}"
+                    
+                    // Split the string into an array
                     def services = env.AFFECTED_SERVICES.split(' ')
                     
                     // Double check that we have a valid container tag
@@ -152,7 +157,7 @@ pipeline {
 
         stage('Clean Up') {
             when {
-                expression { return env.AFFECTED_SERVICES != '' }
+                expression { return env.AFFECTED_SERVICES != null && env.AFFECTED_SERVICES != '' }
             }
             steps {
                 sh "docker system prune -af"
