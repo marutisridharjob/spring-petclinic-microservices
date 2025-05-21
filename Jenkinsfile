@@ -94,7 +94,7 @@ pipeline {
                         }
                     }
 
-                    env.AFFECTED_SERVICES = affectedServices.join(' ')
+                    env.AFFECTED_SERVICES = "${affectedServices.join(' ')}"
                     
                     // Set the container tag to the commit hash (short version)
                     env.CONTAINER_TAG = env.GIT_COMMIT.substring(0, 7)
