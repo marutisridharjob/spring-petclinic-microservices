@@ -45,9 +45,6 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
-                    // Define valid services
-                    def 
-
                     // Get the list of changed files between current commit and last successful build
                     def changedFiles = sh(
                         script: """
