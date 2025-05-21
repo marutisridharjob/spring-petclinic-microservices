@@ -246,23 +246,5 @@ pipeline {
             cleanWs()
             echo "Workspace cleaned"
         }
-        success {
-            echo "Pipeline completed successfully"
-            step([
-                $class: 'GitHubCommitStatusSetter',
-                statusResultSource: [
-                    $class: 'DefaultStatusResultSource'
-                ]
-            ])
-        }
-        failure {
-            echo "Pipeline failed"
-            step([
-                $class: 'GitHubCommitStatusSetter',
-                statusResultSource: [
-                    $class: 'DefaultStatusResultSource'
-                ]
-            ])
-        }
     }
 }
