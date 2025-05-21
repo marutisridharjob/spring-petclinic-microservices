@@ -125,14 +125,8 @@ pipeline {
             }
             steps {
                 script {
-                    if (env.TAG_NAME) {
-                        def CONTAINER_TAG = env.TAG_NAME
-                        echo "Building all services for tag: ${CONTAINER_TAG}"
-                    }
-                    else {
-                        def CONTAINER_TAG = "${env.GIT_COMMIT.take(7)}"
-                        echo "Building all services for commit: ${CONTAINER_TAG}"
-                    }
+                    def CONTAINER_TAG = env.TAG_NAME ? env.TAG_NAME : env.GIT_COMMIT.take(7)
+                    echo "Using tag: ${CONTAINER_TAG}"
 
                     echo "Building images for services: ${AFFECTED_SERVICES}"
                     
