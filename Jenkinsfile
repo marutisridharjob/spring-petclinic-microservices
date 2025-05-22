@@ -158,6 +158,54 @@ pipeline {
                 echo "Docker cleanup and logout completed"
             }
         }
+
+        stage('Connect to GKE cluster') {
+            // when {
+            //     expression { return AFFECTED_SERVICES != '' }
+            // }
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'gke_credentials', variable: 'GKE_CREDENTIALS')]) {
+                        sh """
+                            sudo rm -rf ~/.kube/config
+                            sudo mv ${GKE_CREDENTIALS} ~/.kube/config
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Test connect to GKE') {
+            // when {
+            //     expression { return AFFECTED_SERVICES != '' }
+            // }
+            steps {
+                script {
+                    sh "kubectl get nodes -o wide"
+                }
+            }
+        }
+
+        stage('Deploy k8s') {
+            when { expression { return AFFECTED_SERVICES != '' } }
+            steps {
+                script {
+                    if (env.BRANCH_NAME == 'main') {
+                        echo "Deploying to production"
+                        echo """
+                        I DONT KNOW
+                        """
+                    } else if (env.TAG_NAME != null) {
+                        echo "Deploying to staging ${env.TAG_NAME}-rc"
+                        echo """
+                        I DONT KNOW
+                        """
+                    } else {
+                        echo "Push by developer, manual deploy required"
+                    }
+                }
+            }
+        }
     }
 
     post {
