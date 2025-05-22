@@ -160,33 +160,6 @@ pipeline {
             }
         }
 
-        stage('Connect to GKE cluster') {
-            // when {
-            //     expression { return AFFECTED_SERVICES != '' }
-            // }
-            steps {
-                script {
-                    withCredentials([file(credentialsId: GKE_CREDENTIALS_ID, variable: 'GKE_CREDENTIALS')]) {
-                        sh """
-                            sudo rm -rf ~/.kube/config
-                            sudo mv ${GKE_CREDENTIALS} ~/.kube/config
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Test connect to GKE') {
-            // when {
-            //     expression { return AFFECTED_SERVICES != '' }
-            // }
-            steps {
-                script {
-                    sh "kubectl get nodes -o wide"
-                }
-            }
-        }
-
         stage('Deploy k8s') {
             when { expression { return AFFECTED_SERVICES != '' } }
             steps {
