@@ -166,7 +166,7 @@ pipeline {
             // }
             steps {
                 script {
-                    withCredentials([file(credentialsId: ${GKE_CREDENTIALS_ID}, variable: 'GKE_CREDENTIALS')]) {
+                    withCredentials([file(credentialsId: GKE_CREDENTIALS_ID, variable: 'GKE_CREDENTIALS')]) {
                         sh """
                             sudo rm -rf ~/.kube/config
                             sudo mv ${GKE_CREDENTIALS} ~/.kube/config
@@ -191,7 +191,7 @@ pipeline {
             when { expression { return AFFECTED_SERVICES != '' } }
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: ${GITHUB_CREDENTIALS_ID}, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                    withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                         sh ''' 
                             git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/kiin21/petclinic-gitops.git k8s
                             cd k8s
