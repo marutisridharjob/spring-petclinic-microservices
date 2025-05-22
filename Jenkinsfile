@@ -137,8 +137,9 @@ pipeline {
                         echo "Building and pushing Docker image for ${service}"
                         sh """
                             cd ${service}
-                            mvn clean install -P buildDocker -Dmaven.test.skip=true
-                            docker tag ${env.DOCKER_REGISTRY}/${service}:latest ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
+                            mvn clean install -P buildDocker -Dmaven.test.skip=true \
+                                -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \
+                                -Ddocker.image.tag=${CONTAINER_TAG}
                             docker push ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
                             cd ..
                         """
