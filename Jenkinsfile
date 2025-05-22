@@ -187,6 +187,86 @@ pipeline {
             }
         }
 
+        // stage('Deploy k8s') {
+        //     when { expression { return AFFECTED_SERVICES != '' } }
+        //     steps {
+        //         script {
+        //             withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+        //                 sh ''' 
+        //                     git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/kiin21/petclinic-gitops.git k8s
+        //                     cd k8s
+
+        //                     git config user.name "Jenkins"
+        //                     git config user.email "jenkins@example.com"
+        //                 '''
+        //             }
+
+        //             sh '''
+        //                 cd k8s
+
+        //                 # Extract old version using grep + cut
+        //                 old_version=$(grep '^version:' Chart.yaml | cut -d' ' -f2)
+        //                 echo "Old version: $old_version"
+
+        //                 major=$(echo "$old_version" | cut -d. -f1)
+        //                 minor=$(echo "$old_version" | cut -d. -f2)
+        //                 patch=$(echo "$old_version" | cut -d. -f3)
+
+        //                 new_patch=$((patch + 1))
+        //                 new_version="$major.$minor.$new_patch"
+        //                 echo "New version: $new_version"
+
+        //                 # Update version using sed
+        //                 sed -i "s/^version: .*/version: $new_version/" Chart.yaml
+        //             '''
+
+        //             def COMMIT_MSG = ""
+        //             def shouldDeploy = false
+
+        //             if (env.BRANCH_NAME == 'main') {
+        //                 echo "Deploying to production"
+        //                 AFFECTED_SERVICES.split(' ').each { fullName ->
+        //                     def shortName = fullName.replaceFirst('spring-petclinic-', '')
+        //                     def shortCommit = env.GIT_COMMIT.take(7)
+
+        //                     sh """
+        //                         cd k8s
+        //                         sed -i '/${shortName}:/{n;n;s/tag:.*/tag: ${shortCommit}/}' environments/dev-values.yaml
+        //                     """
+        //                     echo "Updated tag for ${shortName} to ${env.GIT_COMMIT.take(7)}"
+        //                 }
+                        
+        //                 COMMIT_MSG = "Deploy for branch main with commit ${env.GIT_COMMIT.take(7)}"
+        //                 shouldDeploy = true
+
+        //             } else if (env.TAG_NAME != null) {
+        //                 echo "Deploying to staging ${env.TAG_NAME}"
+        //                 COMMIT_MSG = "Deploy for tag: ${env.TAG_NAME}"
+        //                 sh '''
+        //                     cd k8s
+        //                     sed -i "s/^imageTag: .*/imageTag: \\&tag ${TAG_NAME}/" environments/staging-values.yaml
+        //                 ''' 
+        //                 echo "All services are affected, deploying to staging at tag ${env.TAG_NAME}"
+        //                 shouldDeploy = true
+                        
+        //             } else {
+        //                 echo "Push by developer, manual deploy required"
+        //                 shouldDeploy = false
+        //             }
+
+        //             // Only commit and push if we actually made deployment changes
+        //             if (shouldDeploy) {
+        //                 sh """
+        //                     cd k8s
+        //                     git add .
+        //                     git commit -m "${COMMIT_MSG}"
+        //                     git push origin main
+        //                 """
+        //             }
+        //         }
+        //     }
+        // }
+
         stage('Deploy k8s') {
             when { expression { return AFFECTED_SERVICES != '' } }
             steps {
@@ -195,9 +275,6 @@ pipeline {
                         sh ''' 
                             git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/kiin21/petclinic-gitops.git k8s
                             cd k8s
-
-                            git config user.name "Jenkins"
-                            git config user.email "jenkins@example.com"
                         '''
                     }
 
@@ -234,9 +311,15 @@ pipeline {
                                 sed -i '/${shortName}:/{n;n;s/tag:.*/tag: ${shortCommit}/}' environments/dev-values.yaml
                             """
                             echo "Updated tag for ${shortName} to ${env.GIT_COMMIT.take(7)}"
+                            sh """
+                                helm install pet-clinic-dev . \
+                                -f values.yaml \
+                                -f environments/dev-values.yaml \
+                                -n dev
+                            """
                         }
                         
-                        COMMIT_MSG = "Deploy for branch main with commit ${env.GIT_COMMIT.take(7)}"
+                        // COMMIT_MSG = "Deploy for branch main with commit ${env.GIT_COMMIT.take(7)}"
                         shouldDeploy = true
 
                     } else if (env.TAG_NAME != null) {
