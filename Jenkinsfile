@@ -16,7 +16,6 @@ pipeline {
                     try {
                         def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
                         env.GIT_TAG = commitId
-
                         echo "Commit ID: ${env.GIT_TAG}"
                     } catch (Exception e) {
                         echo "Failed to retrieve Commit ID: ${e.getMessage()}"
