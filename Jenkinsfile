@@ -15,6 +15,7 @@ pipeline {
                 script {
                     try {
                         if (env.BRANCH_NAME == 'main') {
+                            git fetch --tags
                             def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
                             if (tag) {
                                 env.GIT_TAG = tag
