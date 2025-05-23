@@ -220,7 +220,7 @@ pipeline {
                                 # Update tag
                                 sed -i "s/^imageTag: .*/imageTag: \\&tag ${TAG_NAME}/" environments/staging-values.yaml
                                 # Update digest
-                                sed -i "s/^imageTag: .*/imageDigest: \\&digest ${digest}/" environments/staging-values.yaml
+                                sed -i "s/^imageDigest: .*/imageDigest: \\&digest ${digest}/" environments/staging-values.yaml
                             """
                         }
 
