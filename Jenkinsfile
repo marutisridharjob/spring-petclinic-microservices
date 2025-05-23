@@ -44,7 +44,6 @@ pipeline {
                     env.CHANGED_SERVICES = getChangedServices()
                     if (env.CHANGED_SERVICES == "NONE") {
                         echo "No relevant changes detected. Skipping build."
-                        currentBuild.result = 'ABORTED'
                         error("No relevant changes detected")
                     } else {
                         echo "Detected changes in services: ${env.CHANGED_SERVICES}"
@@ -53,86 +52,13 @@ pipeline {
             }
         }
 
-        stage('Run Unit Test') {
-            when {
-                expression { env.CHANGED_SERVICES && env.CHANGED_SERVICES.trim() }
-            }
-            steps {
-                script {
-                    sh "apt update && apt install -y maven"
-                    def services = env.CHANGED_SERVICES.split(',')
-                    def coverageResults = []
-                    def servicesToBuild = []
-                    def parallelTests = [:]
-
-                    services.each { service ->
-                    
-                        parallelTests[service] = {
-                            stage("Test: ${service}") {
-                                try {
-                                    sh "mvn test -pl ${service} -DskipTests=false"
-                                    sh "mvn jacoco:report -pl ${service}"
-
-                                    def reportPath = "${service}/target/site/jacoco/index.html"
-                                    def resultPath = "${service}/target/surefire-reports/*.txt"
-
-                                    def coverage = 0
-
-                                    if (fileExists(reportPath)) {
-                                        archiveArtifacts artifacts: resultPath, fingerprint: true
-                                        archiveArtifacts artifacts: reportPath, fingerprint: true
-
-                                        coverage = sh(
-                                            script: """
-                                            grep -oP '(?<=<td class="ctr2">)\\d+%' ${reportPath} | head -1 | sed 's/%//'
-                                            """,
-                                            returnStdout: true
-                                        ).trim()
-
-                                        if (!coverage) {
-                                            echo "⚠️ Warning: Coverage extraction failed for ${service}. Setting coverage to 0."
-                                            coverage = 0
-                                        } else {
-                                            coverage = coverage.toInteger()
-                                        }
-                                    } else {
-                                        echo "⚠️ Warning: No JaCoCo report found for ${service}. Setting coverage to 0."
-                                    }
-
-                                    echo "📊 Code Coverage for ${service}: ${coverage}%"
-                                    coverageResults << "${service}:${coverage}%"
-
-                                    if (coverage < 0) {
-                                        error "❌ ${service} has insufficient test coverage: ${coverage}%. Minimum required is 70%."
-                                    } else {
-                                        servicesToBuild << service
-                                    }
-                                    
-                                } catch (Exception e) {
-                                    echo "❌ Error while testing ${service}: ${e.getMessage()}"
-                                }
-                            }
-                        }
-                    }
-
-                    parallel parallelTests
-
-                    env.CODE_COVERAGES = coverageResults.join(', ')
-                    env.SERVICES_TO_BUILD = servicesToBuild.join(',')
-                    echo "Final Code Coverages: ${env.CODE_COVERAGES}"
-                    echo "Services to Build: ${env.SERVICES_TO_BUILD}"
-                }
-            }
-        }
-
-
         stage('Build Services') {
             when {
-                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() }
+                expression { env.CHANGED_SERVICES.trim() }
             }
             steps {
                 script {
-                    def services = env.SERVICES_TO_BUILD.split(',')
+                    def services = env.CHANGED_SERVICES.split(',')
                     def parallelBuilds = [:]
 
                     services.each { service ->
@@ -160,11 +86,11 @@ pipeline {
 
         stage('Build Docker Image') {
             when {
-                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
+                expression { env.CHANGED_SERVICES.trim() && env.GIT_TAG }
             }
             steps {
                 script {
-                    def services = env.SERVICES_TO_BUILD.split(',')
+                    def services = env.CHANGED_SERVICES.split(',')
                     def parallelDockerBuilds = [:]
 
                     services.each { service ->
@@ -198,11 +124,11 @@ pipeline {
 
         stage('Push Docker Image') {
             when {
-                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
+                expression { env.CHANGED_SERVICES.trim() && env.GIT_TAG }
             }
             steps {
                 script {
-                    def services = env.SERVICES_TO_BUILD.split(',')
+                    def services = env.CHANGED_SERVICES.split(',')
                     def parallelDockerPush = [:]
 
                     services.each { service ->
@@ -220,88 +146,6 @@ pipeline {
                     }
 
                     parallel parallelDockerPush 
-                }
-            }
-        }
-
-        stage('Checkout Manifest Repo') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'petclinic_github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                    script {
-                        sh "rm -rf Petclinic_Manifest"
-                        def repoDir = 'Petclinic_Manifest'
-                        if (!fileExists(repoDir)) {
-                            sh """
-                                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_Manifest.git
-                            """
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Check and Uncomment YAML Files') {
-            steps {
-                dir('Petclinic_Manifest/dev') {
-                    script {
-                        sh '''
-                            for file in $(find . -name "*.yml"); do
-                                if grep -q "^#" "$file"; then
-                                    echo "Uncommenting file: $file"
-                                    sed -i 's/^#//' "$file"
-                                else
-                                    echo "File $file is not commented, skipping"
-                                fi
-                            done
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('Update Manifests') {
-            when {
-                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
-            }
-            steps {
-                dir('Petclinic_Manifest') {
-                    script {
-                        def services = env.SERVICES_TO_BUILD.split(',')
-                        def commitMessages = []
-
-                        services.each { service ->
-                            echo "Updating ${service} from branch: main"
-                            commitMessages.add("${service}:${GIT_TAG}")
-
-                            sh """
-                                echo ${service.drop(15)}
-                                sed -i 's|image:.*|image: ${DOCKER_IMAGE_BASENAME}/${service}:${GIT_TAG}|' dev/${service.drop(17)}/deployment.yml
-                            """
-                        }
-
-                        sh """
-                            echo "Update Docker tags: ${commitMessages.join(', ')}" > commit_message.txt
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Push Changes to GitHub') {
-            steps {
-                dir('Petclinic_Manifest') {
-                    withCredentials([usernamePassword(credentialsId: 'petclinic_github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                        sh """
-                            git remote set-url origin https://github.com/ThuanPhuc27/Petclinic_Manifest.git
-                            git config user.name "jenkins-bot"
-                            git config user.email "jenkins-bot@lptdevops.com"
-
-                            git add .
-                            git commit -F commit_message.txt || echo "Nothing to commit"
-                            git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_Manifest.git main
-
-                        """
-                    }
                 }
             }
         }
