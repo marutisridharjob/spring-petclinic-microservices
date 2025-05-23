@@ -215,11 +215,27 @@ pipeline {
                     } else if (env.TAG_NAME != null) {
                         echo "Deploying to staging ${env.TAG_NAME}"
                         COMMIT_MSG = "Deploy for tag: ${env.TAG_NAME}"
-                        sh '''
-                            cd k8s
-                            sed -i "s/^imageTag: .*/imageTag: \\&tag ${TAG_NAME}/" environments/staging-values.yaml
-                        ''' 
-                        echo "All services are affected, deploying to staging at tag ${env.TAG_NAME}"
+
+                        def services = AFFECTED_SERVICES.split(' ')
+                        for (service in services) {
+                            echo "Building and pushing Docker image for ${service}"
+
+                            sh """
+                                digest=\$(docker inspect --format='{{index .RepoDigests 0}}' ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG} | cut -d'@' -f2)
+
+                                echo "Updating tag and digest in staging-values.yaml for ${service}"
+
+                                cd k8s
+
+                                # Update tag
+                                sed -i '/${service}:/{n;s/tag:.*/tag: ${CONTAINER_TAG}/}' environments/staging-values.yaml
+
+                                # Update digest
+                                sed -i '/${service}:/{n;n;s/digest:.*/digest: '\${digest}'/}' environments/staging-values.yaml
+                            """
+                        }
+
+                        echo "Deploying all services to staging at tag ${env.TAG_NAME}"
                         shouldDeploy = true
                         
                     } else {
