@@ -224,9 +224,6 @@ pipeline {
         }
 
         stage('Clean Up') {
-            when {
-                expression { return AFFECTED_SERVICES != '' || env.TAG_NAME != null }
-            }
             steps {
                 sh "docker system prune -af"
                 sh "docker logout"
@@ -238,6 +235,7 @@ pipeline {
     post {
         always {
             cleanWs()
+            
             echo "Workspace cleaned"
         }
     }
