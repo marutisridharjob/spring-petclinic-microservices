@@ -1,6 +1,5 @@
 pipeline {
-    agent any
-
+    agent { label 'master' }
     environment {
         CHANGED_SERVICES = getChangedServices()
         REGISTRY_URL = "docker.io"
