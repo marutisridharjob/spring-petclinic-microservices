@@ -32,7 +32,6 @@ pipeline {
                     env.CHANGED_SERVICES = getChangedServices()
                     if (env.CHANGED_SERVICES == "NONE") {
                         echo "No relevant changes detected. Skipping build."
-                        currentBuild.result = 'ABORTED'
                         error("No relevant changes detected")
                     } else {
                         echo "Detected changes in services: ${env.CHANGED_SERVICES}"
