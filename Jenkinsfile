@@ -8,16 +8,15 @@ def VALID_SERVICES = [
     'spring-petclinic-vets-service',
     'spring-petclinic-visits-service',
 ]
+
 def AFFECTED_SERVICES = ''
 
 pipeline {
     agent any
-
     tools {
         maven 'Maven-3.9.4'
         jdk 'OpenJDK-17'
     }
-
     environment {
         DOCKER_REGISTRY = 'anhkhoa217'
         GITHUB_CREDENTIALS_ID = 'github_pat'
@@ -25,7 +24,6 @@ pipeline {
         DOCKER_HUB_CREDENTIALS_ID = 'dockerhub_credentials'
         GITHUB_REPO_URL = 'https://github.com/kiin21/spring-petclinic-microservices.git'
     }
-
     stages {
         stage('Clone Code') {
             steps {
@@ -43,22 +41,18 @@ pipeline {
                             credentialsId: env.GITHUB_CREDENTIALS_ID
                         ]]
                     ])
-                    
                     // Explicitly set GIT_COMMIT if it's not already set
                     if (!env.GIT_COMMIT) {
                         env.GIT_COMMIT = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
                     }
-                    
                     echo "Current commit: ${env.GIT_COMMIT}"
                 }
             }
         }
-
         stage('Detect Changes') {
             steps {
                 script {
                     def affectedServices = []
-
                     // Check for tag build first
                     if (env.TAG_NAME) { // If a tag is present, we assume all services are affected
                         echo "A new release found with tag ${env.TAG_NAME}"
@@ -67,13 +61,11 @@ pipeline {
                         echo "Changed services (tag): ${AFFECTED_SERVICES}"
                         return
                     }
-
                     // Regular build with change detection
                     def changedFiles = sh(
                         script: """
                             # Get the last successful commit hash or use HEAD~1
                             LAST_COMMIT=\$(git rev-parse HEAD~1 2>/dev/null || git rev-parse origin/main)
-
                             # Get the changed files
                             git diff --name-only \$LAST_COMMIT HEAD
                         """,
@@ -128,18 +120,15 @@ pipeline {
                 script {
                     def CONTAINER_TAG = env.TAG_NAME ? env.TAG_NAME : env.GIT_COMMIT.take(7)
                     echo "Using tag: ${CONTAINER_TAG}"
-
                     echo "Building images for services: ${AFFECTED_SERVICES}"
-                    
                     // Split the string into an array
                     def services = AFFECTED_SERVICES.split(' ')
-                                      
                     for (service in services) {
                         echo "Building and pushing Docker image for ${service}"
                         sh """
                             cd ${service}
-                            mvn clean install -P buildDocker -Dmaven.test.skip=true \
-                                -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \
+                            mvn clean install -P buildDocker -Dmaven.test.skip=true \\
+                                -Ddocker.image.prefix=${env.DOCKER_REGISTRY} \\
                                 -Ddocker.image.tag=${CONTAINER_TAG}
                             docker push ${env.DOCKER_REGISTRY}/${service}:${CONTAINER_TAG}
                             cd ..
@@ -154,10 +143,9 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                        sh ''' 
+                        sh '''
                             git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/kiin21/petclinic-gitops.git k8s
                             cd k8s
-
                             git config user.name "Jenkins"
                             git config user.email "jenkins@example.com"
                         '''
@@ -165,19 +153,15 @@ pipeline {
 
                     sh '''
                         cd k8s
-
                         # Extract old version using grep + cut
                         old_version=$(grep '^version:' Chart.yaml | cut -d' ' -f2)
                         echo "Old version: $old_version"
-
                         major=$(echo "$old_version" | cut -d. -f1)
                         minor=$(echo "$old_version" | cut -d. -f2)
                         patch=$(echo "$old_version" | cut -d. -f3)
-
                         new_patch=$((patch + 1))
                         new_version="$major.$minor.$new_patch"
                         echo "New version: $new_version"
-
                         # Update version using sed
                         sed -i "s/^version: .*/version: $new_version/" Chart.yaml
                     '''
@@ -190,49 +174,43 @@ pipeline {
                         AFFECTED_SERVICES.split(' ').each { fullName ->
                             def shortName = fullName.replaceFirst('spring-petclinic-', '')
                             def shortCommit = env.GIT_COMMIT.take(7)
-
                             sh """
                                 cd k8s
                                 sed -i '/${shortName}:/{n;n;s/tag:.*/tag: ${shortCommit}/}' environments/dev-values.yaml
                             """
                             echo "Updated tag for ${shortName} to ${env.GIT_COMMIT.take(7)}"
                         }
-                        
                         COMMIT_MSG = "Deploy for branch main with commit ${env.GIT_COMMIT.take(7)}"
                         shouldDeploy = true
-
                     } else if (env.TAG_NAME != null) {
                         echo "Deploying to staging ${env.TAG_NAME}"
                         COMMIT_MSG = "Deploy for tag: ${env.TAG_NAME}"
-
                         def services = AFFECTED_SERVICES.split(' ')
                         for (service in services) {
                             def shortName = service.replaceFirst('spring-petclinic-', '')
                             echo "Building and pushing Docker image for ${service}"
-
+                            
+                            // Get the digest in a single shell command and update the files
                             sh """
-                                digest=\$(docker inspect --format='{{index .RepoDigests 0}}' ${env.DOCKER_REGISTRY}/${service}:${TAG_NAME} | cut -d'@' -f2)
-
-                                echo "Updating tag and digest in staging-values.yaml for ${service}"
-
                                 cd k8s
-
+                                # Get the digest
+                                digest=\$(docker inspect --format='{{index .RepoDigests 0}}' ${env.DOCKER_REGISTRY}/${service}:${env.TAG_NAME} | cut -d'@' -f2)
+                                echo "Digest for ${service}: \$digest"
+                                
                                 # Update tag
-                                sed -i "s/^imageTag: .*/imageTag: \\&tag ${TAG_NAME}/" environments/staging-values.yaml
+                                sed -i "s/^imageTag: .*/imageTag: \\&tag ${env.TAG_NAME}/" environments/staging-values.yaml
+                                
                                 # Update digest
-                                sed -i "s/^imageDigest: .*/imageDigest: \\&digest ${digest}/" environments/staging-values.yaml
+                                sed -i "s/^imageDigest: .*/imageDigest: \\&digest \$digest/" environments/staging-values.yaml
                             """
                         }
-
                         echo "Deploying all services to staging at tag ${env.TAG_NAME}"
                         shouldDeploy = true
-                        
                     } else {
                         echo "Push by developer, manual deploy required"
                         shouldDeploy = false
                     }
 
-                    // Only commit and push if we actually made deployment changes
                     if (shouldDeploy) {
                         sh """
                             cd k8s
@@ -256,6 +234,7 @@ pipeline {
             }
         }
     }
+
     post {
         always {
             cleanWs()
