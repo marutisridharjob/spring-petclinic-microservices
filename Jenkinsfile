@@ -218,10 +218,9 @@ pipeline {
                                 cd k8s
 
                                 # Update tag
-                                sed -i '/${shortName}:/{n;s/tag:.*/tag: ${TAG_NAME}/}' environments/staging-values.yaml
-
+                                sed -i "s/^imageTag: .*/imageTag: \\&tag ${TAG_NAME}/" environments/staging-values.yaml
                                 # Update digest
-                                sed -i '/${shortName}:/{n;n;s/digest:.*/digest: '\${digest}'/}' environments/staging-values.yaml
+                                sed -i "s/^imageTag: .*/imageDigest: \\&digest ${digest}/" environments/staging-values.yaml
                             """
                         }
 
