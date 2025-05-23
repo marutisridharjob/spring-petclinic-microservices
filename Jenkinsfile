@@ -169,7 +169,7 @@ pipeline {
                     def COMMIT_MSG = ""
                     def shouldDeploy = false
 
-                    if (env.BRANCH_NAME == 'main') {
+                    if (env.BRANCH_NAME.startsWith('develop')) {
                         echo "Deploying to production"
                         AFFECTED_SERVICES.split(' ').each { fullName ->
                             def shortName = fullName.replaceFirst('spring-petclinic-', '')
@@ -235,7 +235,6 @@ pipeline {
     post {
         always {
             cleanWs()
-            
             echo "Workspace cleaned"
         }
     }
