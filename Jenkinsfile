@@ -149,17 +149,6 @@ pipeline {
             }
         }
 
-        stage('Clean Up') {
-            when {
-                expression { return AFFECTED_SERVICES != '' || env.TAG_NAME != null }
-            }
-            steps {
-                sh "docker system prune -af"
-                sh "docker logout"
-                echo "Docker cleanup and logout completed"
-            }
-        }
-
         stage('Deploy k8s') {
             when { expression { return AFFECTED_SERVICES != '' } }
             steps {
@@ -253,6 +242,17 @@ pipeline {
                         """
                     }
                 }
+            }
+        }
+
+        stage('Clean Up') {
+            when {
+                expression { return AFFECTED_SERVICES != '' || env.TAG_NAME != null }
+            }
+            steps {
+                sh "docker system prune -af"
+                sh "docker logout"
+                echo "Docker cleanup and logout completed"
             }
         }
     }
