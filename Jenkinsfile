@@ -207,6 +207,7 @@ pipeline {
 
                         def services = AFFECTED_SERVICES.split(' ')
                         for (service in services) {
+                            def shortName = service.replaceFirst('spring-petclinic-', '')
                             echo "Building and pushing Docker image for ${service}"
 
                             sh """
@@ -217,10 +218,10 @@ pipeline {
                                 cd k8s
 
                                 # Update tag
-                                sed -i '/${service}:/{n;s/tag:.*/tag: ${TAG_NAME}/}' environments/staging-values.yaml
+                                sed -i '/${shortName}:/{n;s/tag:.*/tag: ${TAG_NAME}/}' environments/staging-values.yaml
 
                                 # Update digest
-                                sed -i '/${service}:/{n;n;s/digest:.*/digest: '\${digest}'/}' environments/staging-values.yaml
+                                sed -i '/${shortName}:/{n;n;s/digest:.*/digest: '\${digest}'/}' environments/staging-values.yaml
                             """
                         }
 
