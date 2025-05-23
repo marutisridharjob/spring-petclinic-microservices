@@ -20,18 +20,13 @@ pipeline {
                                 env.GIT_TAG = tag
                                 echo "Found Tag: ${env.GIT_TAG}"
                             } else {
-                                def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                                env.GIT_TAG = commitId
-                                echo "No tag found, using Commit ID: ${env.GIT_TAG}"
+                                error("Failed to determine tag")
                             }
                         } else {
-                            def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                            env.GIT_TAG = commitId
-                            echo "Branch is not main, using Commit ID: ${env.GIT_TAG}"
+                            error("Failed to determine tag")
                         }
                     } catch (Exception e) {
-                        echo "Failed to determine tag or commit ID: ${e.getMessage()}"
-                        env.GIT_TAG = "latest"
+                        error("Failed to determine tag : ${e.getMessage()}")
                     }
                 }
             }
