@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'master' }
+    agent { label 'built-in' }
     environment {
         CHANGED_SERVICES = getChangedServices()
         REGISTRY_URL = "docker.io"
