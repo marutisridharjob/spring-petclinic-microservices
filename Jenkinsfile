@@ -15,7 +15,7 @@ pipeline {
                 script {
                     try {
                         if (env.BRANCH_NAME == 'main') {
-                            def tag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+                            def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
                             if (tag) {
                                 env.GIT_TAG = tag
                                 echo "Found Tag: ${env.GIT_TAG}"
