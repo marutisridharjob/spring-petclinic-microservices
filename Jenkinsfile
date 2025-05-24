@@ -90,7 +90,7 @@ pipeline {
                     }
 
                     if (affectedServices.isEmpty()) {
-                        echo "No valid service changes detected. Skipping pipeline."
+                        echo "No valid service changes detected. Skipping pipeline"
                         AFFECTED_SERVICES = ''
                         return
                     }
@@ -155,13 +155,12 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                         sh """
-                            git clone https://$GIT_USERNAME:$GIT_PASSWORD@${env.MANIFEST_REPO} k8s
+                            git clone https://\$GIT_USERNAME:\$GIT_PASSWORD@${env.MANIFEST_REPO} k8s
                             cd k8s
                             git config user.name "Jenkins"
                             git config user.email "jenkins@example.com"
                         """
                     }
-
                     sh '''
                         cd k8s
                         # Extract old version using grep + cut
@@ -233,20 +232,16 @@ pipeline {
                 }
             }
         }
-
-        stage('Clean Up') {
-            steps {
-                sh "docker system prune -af"
-                sh "docker logout"
-                echo "Docker cleanup and logout completed"
-            }
-        }
     }
 
     post {
         always {
             cleanWs()
             echo "Workspace cleaned"
+            
+            sh "docker system prune -af"
+            sh "docker logout"
+            echo "Docker cleanup and logout completed"
         }
     }
 }
