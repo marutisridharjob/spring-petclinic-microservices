@@ -1,8 +1,7 @@
 pipeline {
-    agent any
-
+    agent { label 'built-in' }
     environment {
-        CHANGED_SERVICES = getChangedServices()
+        SERVICES = getServices()
         REGISTRY_URL = "docker.io"
         DOCKER_IMAGE_BASENAME = "thuanlp"
     }
@@ -16,12 +15,14 @@ pipeline {
                     try {
                         if (env.BRANCH_NAME == 'main') {
                             sh 'git fetch --tags'
-                            def tag = sh(script: "git describe --tags --abbrev=0 || true", returnStdout: true).trim()
+                            
+                            def commitId = sh(script: "git rev-parse --short HEAD || true", returnStdout: true).trim()
+                            def tag = sh(script: "git tag --contains ${commitId} || true", returnStdout: true).trim()
                             if (tag) {
                                 env.GIT_TAG = tag
                                 echo "Found Tag: ${env.GIT_TAG}"
                             } else {
-                                error("Failed to determine tag")
+                                env.GIT_TAG = "latest"
                             }
                         } else {
                             error("Failed to determine tag")
@@ -37,12 +38,12 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
-                    env.CHANGED_SERVICES = getChangedServices()
-                    if (env.CHANGED_SERVICES == "NONE") {
+                    env.SERVICES = getServices()
+                    if (env.SERVICES == "NONE") {
                         echo "No relevant changes detected. Skipping build."
                         error("No relevant changes detected")
                     } else {
-                        echo "Detected changes in services: ${env.CHANGED_SERVICES}"
+                        echo "Detected changes in services: ${env.SERVICES}"
                     }
                 }
             }
@@ -50,11 +51,11 @@ pipeline {
 
         stage('Build Services') {
             when {
-                expression { env.CHANGED_SERVICES.trim() }
+                expression { env.SERVICES.trim() }
             }
             steps {
                 script {
-                    def services = env.CHANGED_SERVICES.split(',')
+                    def services = env.SERVICES.split(',')
                     def parallelBuilds = [:]
 
                     services.each { service ->
@@ -82,11 +83,11 @@ pipeline {
 
         stage('Build Docker Image') {
             when {
-                expression { env.CHANGED_SERVICES.trim() && env.GIT_TAG }
+                expression { env.SERVICES.trim() && env.GIT_TAG }
             }
             steps {
                 script {
-                    def services = env.CHANGED_SERVICES.split(',')
+                    def services = env.SERVICES.split(',')
                     def parallelDockerBuilds = [:]
 
                     services.each { service ->
@@ -120,11 +121,11 @@ pipeline {
 
         stage('Push Docker Image') {
             when {
-                expression { env.CHANGED_SERVICES.trim() && env.GIT_TAG }
+                expression { env.SERVICES.trim() && env.GIT_TAG }
             }
             steps {
                 script {
-                    def services = env.CHANGED_SERVICES.split(',')
+                    def services = env.SERVICES.split(',')
                     def parallelDockerPush = [:]
 
                     services.each { service ->
@@ -177,10 +178,7 @@ pipeline {
 
 }
 
-def getChangedServices() {
-
-    def changedFiles = sh(script: "git diff --name-only origin/${env.BRANCH_NAME}~1 origin/${env.BRANCH_NAME}", returnStdout: true).trim().split("\n")
-
+def getServices() {
     def services = [
         'spring-petclinic-customers-service', 
         'spring-petclinic-vets-service',
@@ -191,15 +189,5 @@ def getChangedServices() {
         'spring-petclinic-genai-service',
         'spring-petclinic-api-gateway',
     ]
-
-    def affectedServices = services.findAll { service ->
-        changedFiles.any { file -> file.startsWith(service + "/") }
-    }
-
-    if (affectedServices.isEmpty()) {
-        return "NONE"
-    }
-
-    echo "Changed services: ${affectedServices.join(', ')}"
-    return affectedServices.join(',')
+    return services.join(',')
 }
