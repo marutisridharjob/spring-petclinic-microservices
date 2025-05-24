@@ -50,6 +50,7 @@ pipeline {
                 }
             }
         }
+
         stage('Detect Changes') {
             steps {
                 script {
@@ -126,7 +127,7 @@ pipeline {
                     } else if (env.BRANCH_NAME == 'main') {
                         CONTAINER_TAG = 'latest'
                     } else {
-                        CONTAINER_TAG = env.GIT_COMMIT.take(7)}
+                        CONTAINER_TAG = env.GIT_COMMIT.take(7)
                     }
 
                     echo "Using tag: ${CONTAINER_TAG}"
