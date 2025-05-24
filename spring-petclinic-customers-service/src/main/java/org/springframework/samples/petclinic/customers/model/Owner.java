@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.customers.model;
 
@@ -87,13 +87,13 @@ public class Owner {
     @Override
     public String toString() {
         return new ToStringCreator(this)
-            .append("id", this.getId())
-            .append("lastName", this.getLastName())
-            .append("firstName", this.getFirstName())
-            .append("address", this.address)
-            .append("city", this.city)
-            .append("telephone", this.telephone)
-            .toString();
+                .append("id", this.getId())
+                .append("lastName", this.getLastName())
+                .append("firstName", this.getFirstName())
+                .append("address", this.address)
+                .append("city", this.city)
+                .append("telephone", this.telephone)
+                .toString();
     }
 
     public Integer getId() {

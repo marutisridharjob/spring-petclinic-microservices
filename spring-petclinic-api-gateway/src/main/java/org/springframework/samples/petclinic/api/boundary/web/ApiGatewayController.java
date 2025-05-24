@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.api.boundary.web;
 
@@ -44,8 +44,8 @@ public class ApiGatewayController {
     private final ReactiveCircuitBreakerFactory cbFactory;
 
     public ApiGatewayController(CustomersServiceClient customersServiceClient,
-                                VisitsServiceClient visitsServiceClient,
-                                ReactiveCircuitBreakerFactory cbFactory) {
+            VisitsServiceClient visitsServiceClient,
+            ReactiveCircuitBreakerFactory cbFactory) {
         this.customersServiceClient = customersServiceClient;
         this.visitsServiceClient = visitsServiceClient;
         this.cbFactory = cbFactory;
@@ -54,25 +54,22 @@ public class ApiGatewayController {
     @GetMapping(value = "owners/{ownerId}")
     public Mono<OwnerDetails> getOwnerDetails(final @PathVariable int ownerId) {
         return customersServiceClient.getOwner(ownerId)
-            .flatMap(owner ->
-                visitsServiceClient.getVisitsForPets(owner.getPetIds())
-                    .transform(it -> {
-                        ReactiveCircuitBreaker cb = cbFactory.create("getOwnerDetails");
-                        return cb.run(it, throwable -> emptyVisitsForPets());
-                    })
-                    .map(addVisitsToOwner(owner))
-            );
+                .flatMap(owner -> visitsServiceClient.getVisitsForPets(owner.getPetIds())
+                        .transform(it -> {
+                            ReactiveCircuitBreaker cb = cbFactory.create("getOwnerDetails");
+                            return cb.run(it, throwable -> emptyVisitsForPets());
+                        })
+                        .map(addVisitsToOwner(owner)));
 
     }
 
     private Function<Visits, OwnerDetails> addVisitsToOwner(OwnerDetails owner) {
         return visits -> {
             owner.pets()
-                .forEach(pet -> pet.visits()
-                    .addAll(visits.items().stream()
-                        .filter(v -> v.petId() == pet.id())
-                        .toList())
-                );
+                    .forEach(pet -> pet.visits()
+                            .addAll(visits.items().stream()
+                                    .filter(v -> v.petId() == pet.id())
+                                    .toList()));
             return owner;
         };
     }

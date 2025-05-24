@@ -23,7 +23,7 @@ pipeline {
         GKE_CREDENTIALS_ID = 'gke_credentials'
         DOCKER_HUB_CREDENTIALS_ID = 'dockerhub_credentials'
         GITHUB_REPO_URL = 'https://github.com/kiin21/spring-petclinic-microservices.git'
-        MANIFEST_REPO = 'github.com/kiin21/petclinic-gitops.git'
+        MANIFEST_REPO = 'github.com/kiin21/petclinic-manifests.git'
     }
     stages {
         stage('Clone Code') {
@@ -85,6 +85,8 @@ pipeline {
                     }
 
                     changedFiles.split("\n").each { file ->
+                        echo "Changed file: ->${file}<-"
+                        
                         VALID_SERVICES.each { service ->
                             if (file.startsWith("${service}/") && !affectedServices.contains(service)) {
                                 affectedServices.add(service)
@@ -210,14 +212,14 @@ pipeline {
                         echo "Deploying to production"
                         AFFECTED_SERVICES.split(' ').each { fullName ->
                             def shortName = fullName.replaceFirst('spring-petclinic-', '')
-                            def shortCommit = env.GIT_COMMIT.take(7)
+                            def shortCommit = 'latest'
                             sh """
                                 cd k8s
                                 sed -i '/${shortName}:/{n;n;s/tag:.*/tag: ${shortCommit}/}' environments/dev-values.yaml
                             """
                             echo "Updated tag for ${shortName} to ${env.GIT_COMMIT.take(7)}"
                         }
-                        COMMIT_MSG = "Deploy for branch main with commit ${env.GIT_COMMIT.take(7)}"
+                        COMMIT_MSG = "Deploy for branch main with commit latest"
                         shouldDeploy = true
                     } else if (env.BRANCH_NAME.startsWith('develop')) {
                         echo "Deploying to dev"
@@ -230,7 +232,7 @@ pipeline {
                             """
                             echo "Updated tag for ${shortName} to ${env.GIT_COMMIT.take(7)}"
                         }
-                        COMMIT_MSG = "Deploy for branch main with commit ${env.GIT_COMMIT.take(7)}"
+                        COMMIT_MSG = "Deploy for branch dev with commit ${env.GIT_COMMIT.take(7)}"
                         shouldDeploy = true
                     } else {
                         echo "Push by developer, manual deploy required"

@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.api.application;
 
@@ -34,8 +34,8 @@ public class CustomersServiceClient {
 
     public Mono<OwnerDetails> getOwner(final int ownerId) {
         return webClientBuilder.build().get()
-            .uri("http://customers-service/owners/{ownerId}", ownerId)
-            .retrieve()
-            .bodyToMono(OwnerDetails.class);
+                .uri("http://customers-service/owners/{ownerId}", ownerId)
+                .retrieve()
+                .bodyToMono(OwnerDetails.class);
     }
 }

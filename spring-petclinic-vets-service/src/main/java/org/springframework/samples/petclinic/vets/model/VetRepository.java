@@ -11,15 +11,18 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.vets.model;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
- * Repository class for <code>Vet</code> domain objects All method names are compliant with Spring Data naming
- * conventions so this interface can easily be extended for Spring Data See here: http://static.springsource.org/spring-data/jpa/docs/current/reference/html/jpa.repositories.html#jpa.query-methods.query-creation
+ * Repository class for <code>Vet</code> domain objects All method names are
+ * compliant with Spring Data naming
+ * conventions so this interface can easily be extended for Spring Data See
+ * here:
+ * http://static.springsource.org/spring-data/jpa/docs/current/reference/html/jpa.repositories.html#jpa.query-methods.query-creation
  *
  * @author Ken Krebs
  * @author Juergen Hoeller

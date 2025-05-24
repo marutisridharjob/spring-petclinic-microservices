@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.customers.model;
 
@@ -23,8 +23,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Repository class for <code>Pet</code> domain objects All method names are compliant with Spring Data naming
- * conventions so this interface can easily be extended for Spring Data See here: http://static.springsource.org/spring-data/jpa/docs/current/reference/html/jpa.repositories.html#jpa.query-methods.query-creation
+ * Repository class for <code>Pet</code> domain objects All method names are
+ * compliant with Spring Data naming
+ * conventions so this interface can easily be extended for Spring Data See
+ * here:
+ * http://static.springsource.org/spring-data/jpa/docs/current/reference/html/jpa.repositories.html#jpa.query-methods.query-creation
  *
  * @author Ken Krebs
  * @author Juergen Hoeller
@@ -36,6 +39,7 @@ public interface PetRepository extends JpaRepository<Pet, Integer> {
 
     /**
      * Retrieve all {@link PetType}s from the data store.
+     * 
      * @return a Collection of {@link PetType}s.
      */
     @Query("SELECT ptype FROM PetType ptype ORDER BY ptype.name")
@@ -44,6 +48,4 @@ public interface PetRepository extends JpaRepository<Pet, Integer> {
     @Query("FROM PetType ptype WHERE ptype.id = :typeId")
     Optional<PetType> findPetTypeById(@Param("typeId") int typeId);
 
-
 }
-

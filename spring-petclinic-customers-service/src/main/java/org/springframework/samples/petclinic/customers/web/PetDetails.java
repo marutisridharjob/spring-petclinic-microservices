@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.customers.web;
 
@@ -27,18 +27,17 @@ import java.util.Date;
 
 record PetDetails(
 
-    long id,
+        long id,
 
-    String name,
+        String name,
 
-    String owner,
+        String owner,
 
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
-    Date birthDate,
+        @DateTimeFormat(pattern = "yyyy-MM-dd") Date birthDate,
 
-    PetType type
-) {
+        PetType type) {
     public PetDetails(Pet pet) {
-        this(pet.getId(), pet.getName(), pet.getOwner().getFirstName() + " " + pet.getOwner().getLastName(), pet.getBirthDate(), pet.getType());
+        this(pet.getId(), pet.getName(), pet.getOwner().getFirstName() + " " + pet.getOwner().getLastName(),
+                pet.getBirthDate(), pet.getType());
     }
 }

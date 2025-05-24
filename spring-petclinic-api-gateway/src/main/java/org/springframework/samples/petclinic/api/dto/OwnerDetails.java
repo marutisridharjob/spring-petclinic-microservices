@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.api.dto;
 
@@ -23,21 +23,20 @@ import java.util.List;
  * @author Maciej Szarlinski
  */
 public record OwnerDetails(
-    int id,
-    String firstName,
-    String lastName,
-    String address,
-    String city,
-    String telephone,
-    List<PetDetails> pets) {
+        int id,
+        String firstName,
+        String lastName,
+        String address,
+        String city,
+        String telephone,
+        List<PetDetails> pets) {
 
     @JsonIgnore
     public List<Integer> getPetIds() {
         return pets.stream()
-            .map(PetDetails::id)
-            .toList();
+                .map(PetDetails::id)
+                .toList();
     }
-
 
     public static final class OwnerDetailsBuilder {
         private int id;

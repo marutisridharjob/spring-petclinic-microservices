@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License...
  */
 package org.springframework.samples.petclinic.customers.web;
 
@@ -82,8 +82,10 @@ class OwnerResource {
      */
     @PutMapping(value = "/{ownerId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateOwner(@PathVariable("ownerId") @Min(1) int ownerId, @Valid @RequestBody OwnerRequest ownerRequest) {
-        final Owner ownerModel = ownerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner " + ownerId + " not found"));
+    public void updateOwner(@PathVariable("ownerId") @Min(1) int ownerId,
+            @Valid @RequestBody OwnerRequest ownerRequest) {
+        final Owner ownerModel = ownerRepository.findById(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Owner " + ownerId + " not found"));
 
         ownerEntityMapper.map(ownerModel, ownerRequest);
         log.info("Saving owner {}", ownerModel);
