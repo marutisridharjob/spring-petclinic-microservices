@@ -55,6 +55,7 @@ pipeline {
             }
             steps {
                 script {
+                    sh "apt update && apt install -y maven"
                     def services = env.SERVICES.split(',')
                     def parallelBuilds = [:]
 
@@ -62,7 +63,6 @@ pipeline {
                         parallelBuilds[service] = {
                             stage("Build: ${service}") {
                                 try {
-                                    sh "apt update && apt install -y maven"
                                     echo "🚀 Building: ${service}"
                                     sh "mvn clean package -pl ${service} -DfinalName=app -DskipTests"
                                     
