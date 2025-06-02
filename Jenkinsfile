@@ -62,6 +62,7 @@ pipeline {
                         parallelBuilds[service] = {
                             stage("Build: ${service}") {
                                 try {
+                                    sh "apt update && apt install -y maven"
                                     echo "🚀 Building: ${service}"
                                     sh "mvn clean package -pl ${service} -DfinalName=app -DskipTests"
                                     
