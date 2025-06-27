@@ -255,8 +255,7 @@ def getChangedServices() {
     def services = [
         'spring-petclinic-customers-service', 
         'spring-petclinic-vets-service',
-        'spring-petclinic-visits-service',
-        'hi'
+        'spring-petclinic-visits-service'
     ]
 
     def affectedServices = services.findAll { service ->
