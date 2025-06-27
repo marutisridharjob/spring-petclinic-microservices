@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Combined test class for the Visit service components.
  * Contains nested test classes for controller, model, repository and application tests.
+ * This structure allows for organized and focused testing of each component.
  */
 public class VisitsServiceTests {
 
