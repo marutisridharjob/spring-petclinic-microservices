@@ -1,5 +1,6 @@
 pipeline {
     agent { label 'built-in' }
+
     environment {
         CHANGED_SERVICES = getChangedServices()
         REGISTRY_URL = "docker.io"
@@ -209,7 +210,7 @@ pipeline {
                 }
             }
         }
-   }
+    }
 
     post {
         always {
@@ -225,6 +226,9 @@ pipeline {
                 summary: 'Pipeline completed successfully.',
                 detailsURL: env.BUILD_URL
             )
+            slackSend channel: '#ci-alert', 
+                color: 'good',
+                message: "✅ SUCCESS: Job ${env.JOB_NAME} \n 📌 Branch:  ${env.GIT_BRANCH.replace('origin/', '')} \n 🔍 Commit:  ${env.GIT_COMMIT.take(8)}  \n ⏱️ Time: ${currentBuild.durationString}"
         }
 
         failure {
@@ -236,6 +240,9 @@ pipeline {
                 summary: 'Pipeline failed. Check logs for details.',
                 detailsURL: env.BUILD_URL
             )
+            slackSend channel: '#ci-alert', 
+                color: 'danger', 
+                message: "❌ FAILED: Job ${env.JOB_NAME}  \n 📌 Branch:  ${env.GIT_BRANCH.replace('origin/', '')} \n 🔍 Commit:  ${env.GIT_COMMIT.take(8)}  \n ⏱️ Time: ${currentBuild.durationString}"
         }
     }
 
