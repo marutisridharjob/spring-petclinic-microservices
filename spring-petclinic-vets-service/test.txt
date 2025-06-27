@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 hi helo ha
-=======
-hi helo ha hi
->>>>>>> vets-service
