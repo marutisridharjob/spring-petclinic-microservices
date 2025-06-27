@@ -179,8 +179,10 @@ pipeline {
                     def COMMIT_MSG = ""
                     def shouldDeploy = false
                     if (env.TAG_NAME != null) { // check for tag
-                        echo "BRANCH IS: ${env.BRANCH_NAME}"
-                        if (env.BRANCH_NAME == 'main') {
+                        def actualBranch = gitRef.replaceAll('^refs/heads/', '')
+                        echo "Detected tag ${env.TAG_NAME} on branch ${actualBranch}"
+                        
+                        if (actualBranch == 'main') {
                             echo "Deploying to production for tag ${env.TAG_NAME}"
                             COMMIT_MSG = "Deploy for tag: ${env.TAG_NAME}"
                             def services = AFFECTED_SERVICES.split(' ')
