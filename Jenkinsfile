@@ -16,6 +16,7 @@ pipeline {
                     try {
                         def commitId = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
                         env.GIT_TAG = commitId
+
                         echo "Commit ID: ${env.GIT_TAG}"
                     } catch (Exception e) {
                         echo "Failed to retrieve Commit ID: ${e.getMessage()}"
@@ -209,7 +210,7 @@ pipeline {
                 }
             }
         }
-   }
+    }
 
     post {
         always {
@@ -225,6 +226,9 @@ pipeline {
                 summary: 'Pipeline completed successfully.',
                 detailsURL: env.BUILD_URL
             )
+            slackSend channel: '#ci-alert', 
+                color: 'good',
+                message: "✅ SUCCESS: Job ${env.JOB_NAME} \n 📌 Branch:  ${env.GIT_BRANCH.replace('origin/', '')} \n 🔍 Commit:  ${env.GIT_COMMIT.take(8)}  \n ⏱️ Time: ${currentBuild.durationString}"
         }
 
         failure {
@@ -236,6 +240,9 @@ pipeline {
                 summary: 'Pipeline failed. Check logs for details.',
                 detailsURL: env.BUILD_URL
             )
+            slackSend channel: '#ci-alert', 
+                color: 'danger', 
+                message: "❌ FAILED: Job ${env.JOB_NAME}  \n 📌 Branch:  ${env.GIT_BRANCH.replace('origin/', '')} \n 🔍 Commit:  ${env.GIT_COMMIT.take(8)}  \n ⏱️ Time: ${currentBuild.durationString}"
         }
     }
 
