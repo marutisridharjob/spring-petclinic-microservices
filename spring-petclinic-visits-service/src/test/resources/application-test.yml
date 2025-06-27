@@ -5,14 +5,13 @@ spring:
   sql:
     init:
       schema-locations: classpath*:db/hsqldb/schema.sql
-      data-locations: classpath*:db/hsqldb/data.sql
+      data-locations: # Disable data initialization for tests
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: create-drop
 
 eureka:
   client:
     enabled: false
 
 logging.level.org.springframework: INFO
-
