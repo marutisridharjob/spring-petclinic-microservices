@@ -179,9 +179,12 @@ pipeline {
                     def COMMIT_MSG = ""
                     def shouldDeploy = false
                     if (env.TAG_NAME != null) { // check for tag
-                        def actualBranch = gitRef.replaceAll('^refs/heads/', '')
+                        actualBranch = sh(
+                            script: "git branch -r --contains ${env.TAG_NAME} | grep -v HEAD | head -1 | sed 's/.*origin\\///g' | xargs",
+                            returnStdout: true
+                        ).trim()
                         echo "Detected tag ${env.TAG_NAME} on branch ${actualBranch}"
-                        
+
                         if (actualBranch == 'main') {
                             echo "Deploying to production for tag ${env.TAG_NAME}"
                             COMMIT_MSG = "Deploy for tag: ${env.TAG_NAME}"
