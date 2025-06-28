@@ -184,7 +184,7 @@ pipeline {
                                             echo "Updating ${service} from branch: main"
                                             sh """
                                                 echo ${service.drop(17)}
-                                                sed -i 's|tag:.*|tag: ${GIT_TAG}|' charts/${service.drop(17)}/values.yaml
+                                                sed -i 's|tag:.*|tag: ${GIT_TAG}|' charts/${service.drop(17)}/staging-values.yaml
                                             """
                                         }
                                     }
