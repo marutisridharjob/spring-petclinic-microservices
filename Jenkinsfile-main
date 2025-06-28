@@ -196,8 +196,17 @@ pipeline {
                         }
                     }
                     parallel parallelRedeploy 
+                }
+            }
+        }
 
-                    if (env.GIT_TAG != "dev") {
+        stage('Update Manifest Repo') {
+            when {
+                expression { env.GIT_TAG != "dev"}
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'petclinic_github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                    script {
                         dir('Petclinic_HelmChart') {
                             sh """
                             git remote set-url origin https://github.com/ThuanPhuc27/Petclinic_HelmChart.git
@@ -209,7 +218,7 @@ pipeline {
                             git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_HelmChart.git main
                             """
                         }
-                    }    
+                    }
                 }
             }
         }
