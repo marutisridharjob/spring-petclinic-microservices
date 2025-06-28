@@ -50,7 +50,7 @@ pipeline {
                     // For pull requests, compare with target branch
                     if (env.CHANGE_ID) {
                         echo "Processing Pull Request #${env.CHANGE_ID}"
-                        sh "git fetch origin main"
+                        sh "main:refs/remotes/origin/main"
                         // Set initial GitHub check for PR
                         if (env.CHANGE_ID) {
                             try {
