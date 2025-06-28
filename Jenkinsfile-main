@@ -6,7 +6,7 @@ pipeline {
         DOCKER_IMAGE_BASENAME = "runandgo"
     }
 
-    stages 
+    stages {
         stage('Checkout source') {
             steps {
                 checkout scm
@@ -212,7 +212,7 @@ pipeline {
                             git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_HelmChart.git main
                             """
                         }
-                    } 
+                    }    
                 }
             }
         }
@@ -251,7 +251,6 @@ pipeline {
                 message: "❌ FAILED: Job ${env.JOB_NAME}  \n 📌 Branch:  ${env.GIT_BRANCH.replace('origin/', '')} \n 🔍 Commit:  ${env.GIT_COMMIT.take(8)}  \n ⏱️ Time: ${currentBuild.durationString}"
         }
     }
-
 }
 
 def getServices() {
