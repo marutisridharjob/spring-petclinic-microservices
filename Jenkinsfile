@@ -258,7 +258,11 @@ def getChangedServices() {
         'spring-petclinic-visits-service'
     ]
 
-    def affectedServices = services.findAll { service ->
+    def matchedServices = services.findAll { service ->
+        service.contains(env.BRANCH_NAME)
+    }
+
+    def affectedServices = matchedServices.findAll { service ->
         changedFiles.any { file -> file.startsWith(service + "/") }
     }
 
