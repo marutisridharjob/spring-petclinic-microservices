@@ -161,7 +161,7 @@ pipeline {
                                     def appName = service.replaceFirst(/-service$/, '')
                                     def deploymentName = "${service}-deployment"
                                     echo "${deploymentName}"
-                                    sh "kubectl rollout restart deployment ${deploymentName}"
+                                    sh "kubectl rollout restart deployment ${deploymentName} -n petclinic-dev"
                                 } catch (Exception e) {
                                     echo "❌ Redeploy service failed for ${service}: ${e.getMessage()}"
                                     error("Redeploy service failed for ${service}")
