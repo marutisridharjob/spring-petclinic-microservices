@@ -210,34 +210,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Redeploy') {
-            when {
-                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
-            }
-            steps {
-                script {
-                    def services = env.SERVICES_TO_BUILD.split(',')
-                    def parallelRedeploy = [:]
-
-                    services.each { service ->
-                        parallelRedeploy[service] = {
-                            stage("Docker Push: ${service}") {
-                                try {
-                                    echo "🐳 Push Docker Image for: ${service}"
-                                    sh "docker push ${DOCKER_IMAGE_BASENAME}/${service}:${env.GIT_TAG}"
-                                } catch (Exception e) {
-                                    echo "❌ Docker Push failed for ${service}: ${e.getMessage()}"
-                                    error("Docker Push failed for ${service}")
-                                }
-                            }
-                        }
-                    }
-
-                    parallel parallelRedeploy 
-                }
-            }
-        }
     }
 
     post {
