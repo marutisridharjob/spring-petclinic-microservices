@@ -215,6 +215,8 @@ pipeline {
 }
 
 def getServices() {
+    def changedFiles = sh(script: "git diff --name-only origin/${env.BRANCH_NAME}~1 origin/${env.BRANCH_NAME}", returnStdout: true).trim().split("\n")
+
     def services = [
         'spring-petclinic-customers-service', 
         'spring-petclinic-vets-service',
@@ -225,5 +227,13 @@ def getServices() {
         'spring-petclinic-genai-service',
         'spring-petclinic-api-gateway',
     ]
-    return services.join(',')
+    def affectedServices = services.findAll { service ->
+        changedFiles.any { file -> file.startsWith(service + "/") }
+    }
+
+    if (affectedServices.isEmpty()) {
+        return "NONE"
+    }
+    echo "Changed services: ${affectedServices.join(', ')}"
+    return affectedServices.join(',')
 }
