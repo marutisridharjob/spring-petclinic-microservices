@@ -6,7 +6,7 @@ pipeline {
         DOCKER_IMAGE_BASENAME = "runandgo"
     }
 
-    stages {
+    stages 
         stage('Checkout source') {
             steps {
                 checkout scm
@@ -144,6 +144,25 @@ pipeline {
             }
         }
 
+        stage('Checkout Manifest Repo') {
+            when {
+                expression { env.GIT_TAG != "dev"}
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'petclinic_github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                    script {
+                        sh "rm -rf Petclinic_HelmChart"
+                        def repoDir = 'Petclinic_HelmChart'
+                        if (!fileExists(repoDir)) {
+                            sh """
+                                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_HelmChart.git
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Redeploy') {
             when {
                 expression { env.SERVICES.trim() && env.GIT_TAG }
@@ -152,7 +171,6 @@ pipeline {
                 script {
                     def services = env.SERVICES.split(',')
                     def parallelRedeploy = [:]
-
                     services.each { service ->
                         parallelRedeploy[service] = {
                             stage("Redeploy service: ${service}") {
@@ -164,6 +182,15 @@ pipeline {
                                         echo "${deploymentName}"
                                         sh "kubectl rollout restart deployment ${deploymentName} -n petclinic-dev"
                                     }
+                                    else { 
+                                        dir('Petclinic_HelmChart') {               
+                                            echo "Updating ${service} from branch: main"
+                                            sh """
+                                                echo ${service.drop(17)}
+                                                sed -i 's|tag:.*|tag: ${GIT_TAG}|' chart/${service.drop(17)}/values.yaml
+                                            """
+                                        }
+                                    }
                                 } catch (Exception e) {
                                     echo "❌ Redeploy service failed for ${service}: ${e.getMessage()}"
                                     error("Redeploy service failed for ${service}")
@@ -171,8 +198,21 @@ pipeline {
                             }
                         }
                     }
-
                     parallel parallelRedeploy 
+
+                    if (env.GIT_TAG != "dev") {
+                        dir('Petclinic_HelmChart') {
+                            sh """
+                            git remote set-url origin https://github.com/ThuanPhuc27/Petclinic_HelmChart.git
+                            git config user.name "jenkins-bot"
+                            git config user.email "jenkins-bot@lptdevops.com"
+    
+                            git add .
+                            git commit -m 'update services tag'
+                            git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ThuanPhuc27/Petclinic_HelmChart.git main
+                            """
+                        }
+                    } 
                 }
             }
         }
