@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'pet' }
+    agent { label 'built-in' }
 
     environment {
         CHANGED_SERVICES = getChangedServices()
