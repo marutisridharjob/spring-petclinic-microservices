@@ -13,8 +13,7 @@ pipeline {
 
                 script {
                     try {
-                        def commitId = sh(script: "git rev-parse --short HEAD || true", returnStdout: true).trim()
-                        def tag = sh(script: "git tag --contains ${commitId} || true", returnStdout: true).trim()
+                        def tag = sh(script: "git describe --tags --exact-match HEAD || true", returnStdout: true).trim()
                         if (tag) {
                             env.GIT_TAG = tag
                             echo "Found Tag: ${env.GIT_TAG}"
