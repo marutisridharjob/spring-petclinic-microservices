@@ -146,7 +146,7 @@ pipeline {
 
         stage('Redeploy') {
             when {
-                expression { env.SERVICES_TO_BUILD && env.SERVICES_TO_BUILD.trim() && env.GIT_TAG }
+                expression { env.SERVICES.trim() && env.GIT_TAG }
             }
             steps {
                 script {
@@ -157,11 +157,13 @@ pipeline {
                         parallelRedeploy[service] = {
                             stage("Redeploy service: ${service}") {
                                 try {
-                                    echo "🐳 Redeploy service: ${service}"
-                                    def appName = service.replaceFirst(/-service$/, '')
-                                    def deploymentName = "${service}-deployment"
-                                    echo "${deploymentName}"
-                                    sh "kubectl rollout restart deployment ${deploymentName} -n petclinic-dev"
+                                    if(env.GIT_TAG =="dev"){
+                                        echo "🐳 Redeploy service: ${service}"
+                                        def appName = service.replaceFirst(/-service$/, '')
+                                        def deploymentName = "${service}-deployment"
+                                        echo "${deploymentName}"
+                                        sh "kubectl rollout restart deployment ${deploymentName} -n petclinic-dev"
+                                    }
                                 } catch (Exception e) {
                                     echo "❌ Redeploy service failed for ${service}: ${e.getMessage()}"
                                     error("Redeploy service failed for ${service}")
