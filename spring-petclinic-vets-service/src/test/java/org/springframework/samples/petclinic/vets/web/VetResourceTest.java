@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.samples.petclinic.vets.model.Specialty;
 import org.springframework.samples.petclinic.vets.model.Vet;
 import org.springframework.samples.petclinic.vets.model.VetRepository;
 import org.springframework.test.context.ActiveProfiles;
@@ -52,11 +53,21 @@ class VetResourceTest {
 
         Vet vet = new Vet();
         vet.setId(1);
+        vet.setFirstName("Anna");
+        vet.setLastName("Smith");
+
+        Specialty specialty = new Specialty();
+        specialty.setName("surgery");
+
+        vet.addSpecialty(specialty);
 
         given(vetRepository.findAll()).willReturn(asList(vet));
 
         mvc.perform(get("/vets").accept(MediaType.APPLICATION_JSON))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(1));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].firstName").value("Anna"))
+                .andExpect(jsonPath("$[0].lastName").value("Smith"))
+                .andExpect(jsonPath("$[0].specialties[0].name").value("surgery"));
     }
 }

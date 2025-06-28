@@ -7,7 +7,7 @@ pipeline {
     
     environment {
         MINIMUM_COVERAGE = '70'
-        GITHUB_APP_CREDENTIAL = credentials('cfb6bc03-a8c4-4842-a1a6-7256395a492f')
+        GITHUB_APP_CREDENTIAL = credentials('Iv23liEOntjPuDy6ItpO')
     }
     
     options {
