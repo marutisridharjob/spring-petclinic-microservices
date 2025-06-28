@@ -159,8 +159,8 @@ pipeline {
                                 try {
                                     if(env.GIT_TAG =="dev"){
                                         echo "🐳 Redeploy service: ${service}"
-                                        def appName = service.replaceFirst(/-service$/, '')
-                                        def deploymentName = "${service}-deployment"
+                                        def appName = service.replaceFirst(/^spring-/, '')
+                                        def deploymentName = "${appName}-deployment"
                                         echo "${deploymentName}"
                                         sh "kubectl rollout restart deployment ${deploymentName} -n petclinic-dev"
                                     }
