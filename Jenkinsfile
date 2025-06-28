@@ -63,14 +63,14 @@ pipeline {
                     if (CHANGED_SERVICES_LIST.contains('all')) {
                         echo 'Testing all modules'
                         sh './mvnw clean test'
-                        // Debug: Kiểm tra nội dung thư mục target
+                        // Debug: Check target directory contents
                         sh 'find . -name "surefire-reports" -type d'
                         sh 'find . -name "jacoco.exec" -type f'
                     } else {
                         def modules = CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service" }.join(',')
                         echo "Testing modules: ${modules}"
                         sh "./mvnw clean test -pl ${modules}"
-                        // Debug: Kiểm tra nội dung thư mục target
+                        // Debug: Check target directory contents
                         sh 'find . -name "surefire-reports" -type d'
                         sh 'find . -name "jacoco.exec" -type f'
                     }
@@ -114,6 +114,8 @@ pipeline {
                         def jacocoFiles = sh(script: "find . -name 'jacoco.exec' -type f", returnStdout: true).trim()
                         if (jacocoFiles) {
                             echo "Found JaCoCo files: ${jacocoFiles}"
+                            
+                            // Generate overall JaCoCo report
                             jacoco(
                                 execPattern: jacocoPattern,
                                 classPattern: CHANGED_SERVICES_LIST.contains('all') ?
@@ -121,76 +123,129 @@ pipeline {
                                     CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service/target/classes" }.join(','),
                                 sourcePattern: CHANGED_SERVICES_LIST.contains('all') ?
                                     '**/src/main/java' :
-                                    CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service/src/main/java" }.join(',')
+                                    CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service/src/main/java" }.join(','),
+                                changeBuildStatus: false,
+                                minimumLineCoverage: '0',
+                                maximumLineCoverage: '100'
                             )
                         } else {
                             echo 'No JaCoCo execution data found, skipping coverage report.'
                         }
                     }
                 }
-            }
-        }
 
-stage('Check Code Coverage') {
-    steps {
-        script {
-            def failedServices = []
-
-            CHANGED_SERVICES_LIST.each { service ->
-                if (service in ['customers', 'visits', 'vets']) {
-                    def coverageReport = "spring-petclinic-${service}-service/target/site/jacoco/jacoco.xml"
-                    def coverageThreshold = 70.0
-
-                    def lineCoverage = sh(script: """
-                        if [ -f ${coverageReport} ]; then
-                            awk '
-                                /<counter type="LINE"[^>]*missed=/ {
-                                    split(\$0, a, "[ \\\"=]+");
-                                    # Debug output
-                                    print "Debug: Checking jacoco.xml for ${service}..." > "/dev/stderr";
-                                    print "Raw line: " \$0 > "/dev/stderr";
-                                    print "Array after split:" > "/dev/stderr";
-                                    for (i in a) print "a[" i "] = " a[i] > "/dev/stderr";
-                                    # Find missed and covered indices
-                                    for (i in a) {
-                                        if (a[i] == "missed") missed = a[i+1];
-                                        if (a[i] == "covered") covered = a[i+1];
+                success {
+                    script {
+                        def failed = []
+                        
+                        CHANGED_SERVICES_LIST.each { service ->
+                            if (service != 'all' && service in ['customers', 'visits', 'vets', 'genai', 'api-gateway', 'discovery', 'config', 'admin']) {
+                                def servicePath = "spring-petclinic-${service}-service"
+                                def jacocoExecFile = "${servicePath}/target/jacoco.exec"
+                                
+                                if (fileExists(jacocoExecFile)) {
+                                    echo "Checking coverage for ${service}..."
+                                    
+                                    // Generate individual JaCoCo report for this service
+                                    def individualResult = jacoco(
+                                        execPattern: "${servicePath}/target/jacoco.exec",
+                                        classPattern: "${servicePath}/target/classes",
+                                        sourcePattern: "${servicePath}/src/main/java",
+                                        buildOverBuild: false,
+                                        changeBuildStatus: false,
+                                        minimumLineCoverage: '0',
+                                        maximumLineCoverage: '100'
+                                    )
+                                    
+                                    // Get the coverage result from the plugin
+                                    def result = manager.build.getAction(hudson.plugins.jacoco.JacocoBuildAction)
+                                    
+                                    if (result) {
+                                        def lineCoverage = result.lineCoverage?.getPercentageFloat() ?: 0
+                                        echo "Line Coverage for ${service}: ${lineCoverage}%"
+                                        
+                                        if (lineCoverage < 70.0) {
+                                            failed.add("${service} (${lineCoverage}%)")
+                                        }
+                                    } else {
+                                        echo "No JaCoCo result found for ${service}, assuming 0%"
+                                        failed.add("${service} (0%)")
                                     }
-                                    print "missed = " missed ", covered = " covered > "/dev/stderr";
-                                    sum = missed + covered;
-                                    print "sum (missed + covered) = " sum > "/dev/stderr";
-                                    coverage = (sum > 0 ? (covered / sum) * 100 : 0);
-                                    print "Coverage = " coverage "%" > "/dev/stderr";
-                                    print "-----" > "/dev/stderr";
-                                    # Output final coverage value to stdout
-                                    print coverage;
+                                } else {
+                                    echo "No JaCoCo exec file found for ${service}, assuming 0%"
+                                    failed.add("${service} (0%)")
                                 }
-                            ' ${coverageReport}
-                        else
-                            echo "File not found: ${coverageReport}" > "/dev/stderr"
-                            echo "0"
-                        fi
-                    """, returnStdout: true).trim()
-
-                    if (lineCoverage) {
-                        echo "Code coverage for ${service}: ${lineCoverage}%"
-                        def coverageValue = lineCoverage.toDouble()
-                        if (coverageValue < coverageThreshold) {
-                            failedServices.add(service)
+                            }
                         }
-                    } else {
-                        echo "No coverage report found for ${service}, assuming 0%"
-                        failedServices.add(service)
+
+                        if (!failed.isEmpty()) {
+                            error "Code coverage below 70% for services: ${failed.join(', ')}"
+                        }
                     }
                 }
             }
-
-            if (!failedServices.isEmpty()) {
-                error "The following services failed code coverage threshold (${coverageThreshold}%): ${failedServices.join(', ')}"
-            }
         }
-    }
-}
+
+// stage('Check Code Coverage') {
+//     steps {
+//         script {
+//             def failedServices = []
+
+//             CHANGED_SERVICES_LIST.each { service ->
+//                 if (service in ['customers', 'visits', 'vets']) {
+//                     def coverageReport = "spring-petclinic-${service}-service/target/site/jacoco/jacoco.xml"
+//                     def coverageThreshold = 70.0
+
+//                     def lineCoverage = sh(script: """
+//                         if [ -f ${coverageReport} ]; then
+//                             awk '
+//                                 /<counter type="LINE"[^>]*missed=/ {
+//                                     split(\$0, a, "[ \\\"=]+");
+//                                     # Debug output
+//                                     print "Debug: Checking jacoco.xml for ${service}..." > "/dev/stderr";
+//                                     print "Raw line: " \$0 > "/dev/stderr";
+//                                     print "Array after split:" > "/dev/stderr";
+//                                     for (i in a) print "a[" i "] = " a[i] > "/dev/stderr";
+//                                     # Find missed and covered indices
+//                                     for (i in a) {
+//                                         if (a[i] == "missed") missed = a[i+1];
+//                                         if (a[i] == "covered") covered = a[i+1];
+//                                     }
+//                                     print "missed = " missed ", covered = " covered > "/dev/stderr";
+//                                     sum = missed + covered;
+//                                     print "sum (missed + covered) = " sum > "/dev/stderr";
+//                                     coverage = (sum > 0 ? (covered / sum) * 100 : 0);
+//                                     print "Coverage = " coverage "%" > "/dev/stderr";
+//                                     print "-----" > "/dev/stderr";
+//                                     # Output final coverage value to stdout
+//                                     print coverage;
+//                                 }
+//                             ' ${coverageReport}
+//                         else
+//                             echo "File not found: ${coverageReport}" > "/dev/stderr"
+//                             echo "0"
+//                         fi
+//                     """, returnStdout: true).trim()
+
+//                     if (lineCoverage) {
+//                         echo "Code coverage for ${service}: ${lineCoverage}%"
+//                         def coverageValue = lineCoverage.toDouble()
+//                         if (coverageValue < coverageThreshold) {
+//                             failedServices.add(service)
+//                         }
+//                     } else {
+//                         echo "No coverage report found for ${service}, assuming 0%"
+//                         failedServices.add(service)
+//                     }
+//                 }
+//             }
+
+//             if (!failedServices.isEmpty()) {
+//                 error "The following services failed code coverage threshold (${coverageThreshold}%): ${failedServices.join(', ')}"
+//             }
+//         }
+//     }
+// }
 
 
         stage('Build') {
