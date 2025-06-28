@@ -150,7 +150,7 @@ pipeline {
             }
             steps {
                 script {
-                    def services = env.SERVICES_TO_BUILD.split(',')
+                    def services = env.SERVICES.split(',')
                     def parallelRedeploy = [:]
 
                     services.each { service ->
@@ -176,7 +176,7 @@ pipeline {
                 }
             }
         }
-   }
+    }
 
     post {
         always {
