@@ -20,6 +20,7 @@ import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.samples.petclinic.customers.model.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -49,6 +50,14 @@ class PetResource {
     @GetMapping("/petTypes")
     public List<PetType> getPetTypes() {
         return petRepository.findPetTypes();
+    }
+    
+    @GetMapping("/pets/error500")
+    public ResponseEntity<String> triggerErrorManually() {
+        log.error("Returning 500 Internal Server Error manually");
+        return ResponseEntity
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body("Simulated 500 Internal Server Error");
     }
 
     @PostMapping("/owners/{ownerId}/pets")
