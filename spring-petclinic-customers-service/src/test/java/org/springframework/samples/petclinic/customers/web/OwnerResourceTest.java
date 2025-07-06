@@ -1,85 +1,85 @@
-// package org.springframework.samples.petclinic.customers.web;
+package org.springframework.samples.petclinic.customers.web;
 
-// import org.junit.jupiter.api.BeforeEach;
-// import org.junit.jupiter.api.Test;
-// import org.junit.jupiter.api.extension.ExtendWith;
-// import org.mockito.InjectMocks;
-// import org.mockito.Mock;
-// import org.mockito.Mockito;
-// import org.mockito.junit.jupiter.MockitoExtension;
-// import org.springframework.http.MediaType;
-// import org.springframework.samples.petclinic.customers.model.Owner;
-// import org.springframework.samples.petclinic.customers.model.OwnerRepository;
-// import org.springframework.samples.petclinic.customers.web.mapper.OwnerEntityMapper;
-// import org.springframework.test.web.servlet.MockMvc;
-// import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.samples.petclinic.customers.model.Owner;
+import org.springframework.samples.petclinic.customers.model.OwnerRepository;
+import org.springframework.samples.petclinic.customers.web.mapper.OwnerEntityMapper;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-// import java.util.Arrays;
-// import java.util.Optional;
+import java.util.Arrays;
+import java.util.Optional;
 
-// import static org.junit.jupiter.api.Assertions.assertEquals;
-// import static org.mockito.ArgumentMatchers.any;
-// import static org.mockito.BDDMockito.given;
-// import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-// import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-// @ExtendWith(MockitoExtension.class)
-// class OwnerResourceTest {
+@ExtendWith(MockitoExtension.class)
+class OwnerResourceTest {
 
-//    private MockMvc mockMvc;
+   private MockMvc mockMvc;
 
-//    @Mock
-//    private OwnerRepository ownerRepository;
+   @Mock
+   private OwnerRepository ownerRepository;
 
-//    @Mock
-//    private OwnerEntityMapper ownerEntityMapper;
+   @Mock
+   private OwnerEntityMapper ownerEntityMapper;
 
-//    @InjectMocks
-//    private OwnerResource ownerResource;
+   @InjectMocks
+   private OwnerResource ownerResource;
 
-//    @BeforeEach
-//    void setUp() {
-//        mockMvc = MockMvcBuilders.standaloneSetup(ownerResource).build();
-//    }
+   @BeforeEach
+   void setUp() {
+       mockMvc = MockMvcBuilders.standaloneSetup(ownerResource).build();
+   }
 
-//    @Test
-//    void shouldCreateOwner_WhenValidRequest() throws Exception {
-//        Owner owner = new Owner();
-//        owner.setId(1);
-//        owner.setFirstName("John");
-//        owner.setLastName("Doe");
-//        owner.setAddress("123 Street");
-//        owner.setCity("New York");
-//        owner.setTelephone("1234567890");
+   @Test
+   void shouldCreateOwner_WhenValidRequest() throws Exception {
+       Owner owner = new Owner();
+       owner.setId(1);
+       owner.setFirstName("John");
+       owner.setLastName("Doe");
+       owner.setAddress("123 Street");
+       owner.setCity("New York");
+       owner.setTelephone("1234567890");
 
-//        given(ownerEntityMapper.map(any(Owner.class), any(OwnerRequest.class)))
-//            .willAnswer(invocation -> {
-//                Owner o = invocation.getArgument(0);
-//                OwnerRequest request = invocation.getArgument(1);
-//                o.setFirstName(request.firstName());
-//                o.setLastName(request.lastName());
-//                o.setAddress(request.address());
-//                o.setCity(request.city());
-//                o.setTelephone(request.telephone());
-//                o.setId(1);
-//                return o;
-//            });
+       given(ownerEntityMapper.map(any(Owner.class), any(OwnerRequest.class)))
+           .willAnswer(invocation -> {
+               Owner o = invocation.getArgument(0);
+               OwnerRequest request = invocation.getArgument(1);
+               o.setFirstName(request.firstName());
+               o.setLastName(request.lastName());
+               o.setAddress(request.address());
+               o.setCity(request.city());
+               o.setTelephone(request.telephone());
+               o.setId(1);
+               return o;
+           });
 
-//        given(ownerRepository.save(any(Owner.class))).willReturn(owner);
+       given(ownerRepository.save(any(Owner.class))).willReturn(owner);
 
-//        mockMvc.perform(post("/owners")
-//                .contentType(MediaType.APPLICATION_JSON)
-//                .content("""
-//                {
-//                    "firstName": "John",
-//                    "lastName": "Doe",
-//                    "address": "123 Street",
-//                    "city": "New York",
-//                    "telephone": "1234567890"
-//                }
-//                """))
-//            .andExpect(status().isCreated());
-//    }
+       mockMvc.perform(post("/owners")
+               .contentType(MediaType.APPLICATION_JSON)
+               .content("""
+               {
+                   "firstName": "John",
+                   "lastName": "Doe",
+                   "address": "123 Street",
+                   "city": "New York",
+                   "telephone": "1234567890"
+               }
+               """))
+           .andExpect(status().isCreated());
+   }
 
 //    @Test
 //    void shouldReturnOwner_WhenOwnerExists() throws Exception {
@@ -236,4 +236,4 @@
 //         assert true;
 //     }
 
-// }
+}
