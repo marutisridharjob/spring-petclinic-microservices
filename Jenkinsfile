@@ -15,7 +15,7 @@ pipeline {
         CUSTOMERS_SERVICE_PATH = "spring-petclinic-customers-service"
         VISITS_SERVICE_PATH = "spring-petclinic-visits-service"
         VETS_SERVICE_PATH = "spring-petclinic-vets-service"
-        GENAI_SERVICE_PATH = "spring-petclinic-genai-service"
+        GENAI_SERVICE_PATH = "spring-petclinic-genai-service"  
     }
     
     stages {
@@ -58,7 +58,7 @@ pipeline {
                             // Get the previous successful build's commit
                             def previousCommit = ""
                             if (currentBuild.previousSuccessfulBuild) {
-                                previousCommit = sh(script: "git rev-parse HEAD~1", returnStdout: true).trim()
+                                previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT 
                             } else {
                                 echo "No previous successful build found, comparing with previous commit"
                                 previousCommit = sh(script: "git rev-parse HEAD~1", returnStdout: true).trim()
@@ -138,9 +138,8 @@ pipeline {
                                     }
                                 }
                             } else {
-                                echo "No changes detected or git diff returned empty result"
-                                currentBuild.result = 'ABORTED'
-                                error("No changes detected to build")
+                                echo "No changes detected - skipping build"
+                                env.SKIP_BUILD = "true"
                             }
                         } catch (Exception e) {
                             echo "Error detecting changes: ${e.message}"
@@ -170,7 +169,20 @@ pipeline {
             }
         }
         
+        stage('Skip Build') {
+            when {
+                environment name: 'SKIP_BUILD', value: 'true'
+            }
+            steps {
+                echo 'No changes detected - skipping build and test stages'
+                echo 'Build completed successfully with no changes'
+            }
+        }
+        
         stage('Build') {
+            when {
+                not { environment name: 'SKIP_BUILD', value: 'true' }
+            }
             parallel {
                 stage('Config Server') {
                     when {
@@ -271,6 +283,9 @@ pipeline {
         }
         
         stage('Test') {
+            when {
+                not { environment name: 'SKIP_BUILD', value: 'true' }
+            }
             parallel {
                 stage('Customers Service') { 
                     when { 
