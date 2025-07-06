@@ -15,7 +15,7 @@ pipeline {
         CUSTOMERS_SERVICE_PATH = "spring-petclinic-customers-service"
         VISITS_SERVICE_PATH = "spring-petclinic-visits-service"
         VETS_SERVICE_PATH = "spring-petclinic-vets-service"
-        GENAI_SERVICE_PATH = "spring-petclinic-genai-service" 
+        GENAI_SERVICE_PATH = "spring-petclinic-genai-service"  
     }
     
     stages {
