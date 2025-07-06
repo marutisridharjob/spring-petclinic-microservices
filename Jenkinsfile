@@ -186,68 +186,6 @@ pipeline {
             }
         }
 
-// stage('Check Code Coverage') {
-//     steps {
-//         script {
-//             def failedServices = []
-
-//             CHANGED_SERVICES_LIST.each { service ->
-//                 if (service in ['customers', 'visits', 'vets']) {
-//                     def coverageReport = "spring-petclinic-${service}-service/target/site/jacoco/jacoco.xml"
-//                     def coverageThreshold = 70.0
-
-//                     def lineCoverage = sh(script: """
-//                         if [ -f ${coverageReport} ]; then
-//                             awk '
-//                                 /<counter type="LINE"[^>]*missed=/ {
-//                                     split(\$0, a, "[ \\\"=]+");
-//                                     # Debug output
-//                                     print "Debug: Checking jacoco.xml for ${service}..." > "/dev/stderr";
-//                                     print "Raw line: " \$0 > "/dev/stderr";
-//                                     print "Array after split:" > "/dev/stderr";
-//                                     for (i in a) print "a[" i "] = " a[i] > "/dev/stderr";
-//                                     # Find missed and covered indices
-//                                     for (i in a) {
-//                                         if (a[i] == "missed") missed = a[i+1];
-//                                         if (a[i] == "covered") covered = a[i+1];
-//                                     }
-//                                     print "missed = " missed ", covered = " covered > "/dev/stderr";
-//                                     sum = missed + covered;
-//                                     print "sum (missed + covered) = " sum > "/dev/stderr";
-//                                     coverage = (sum > 0 ? (covered / sum) * 100 : 0);
-//                                     print "Coverage = " coverage "%" > "/dev/stderr";
-//                                     print "-----" > "/dev/stderr";
-//                                     # Output final coverage value to stdout
-//                                     print coverage;
-//                                 }
-//                             ' ${coverageReport}
-//                         else
-//                             echo "File not found: ${coverageReport}" > "/dev/stderr"
-//                             echo "0"
-//                         fi
-//                     """, returnStdout: true).trim()
-
-//                     if (lineCoverage) {
-//                         echo "Code coverage for ${service}: ${lineCoverage}%"
-//                         def coverageValue = lineCoverage.toDouble()
-//                         if (coverageValue < coverageThreshold) {
-//                             failedServices.add(service)
-//                         }
-//                     } else {
-//                         echo "No coverage report found for ${service}, assuming 0%"
-//                         failedServices.add(service)
-//                     }
-//                 }
-//             }
-
-//             if (!failedServices.isEmpty()) {
-//                 error "The following services failed code coverage threshold (${coverageThreshold}%): ${failedServices.join(', ')}"
-//             }
-//         }
-//     }
-// }
-
-
         stage('Build') {
             steps {
                 script {
