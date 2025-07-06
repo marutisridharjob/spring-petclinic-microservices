@@ -81,159 +81,159 @@ class OwnerResourceTest {
            .andExpect(status().isCreated());
    }
 
-//    @Test
-//    void shouldReturnOwner_WhenOwnerExists() throws Exception {
-//        Owner owner = new Owner();
-//        owner.setId(1);
-//        owner.setFirstName("John");
-//        owner.setLastName("Doe");
-//        owner.setAddress("123 Street");
-//        owner.setCity("New York");
-//        owner.setTelephone("1234567890");
+   @Test
+   void shouldReturnOwner_WhenOwnerExists() throws Exception {
+       Owner owner = new Owner();
+       owner.setId(1);
+       owner.setFirstName("John");
+       owner.setLastName("Doe");
+       owner.setAddress("123 Street");
+       owner.setCity("New York");
+       owner.setTelephone("1234567890");
 
-//        given(ownerRepository.findById(1)).willReturn(Optional.of(owner));
+       given(ownerRepository.findById(1)).willReturn(Optional.of(owner));
 
-//        mockMvc.perform(get("/owners/1")
-//                .accept(MediaType.APPLICATION_JSON))
-//            .andExpect(status().isOk())
-//            .andExpect(jsonPath("$.id").value(1))
-//            .andExpect(jsonPath("$.firstName").value("John"))
-//            .andExpect(jsonPath("$.lastName").value("Doe"))
-//            .andExpect(jsonPath("$.address").value("123 Street"))
-//            .andExpect(jsonPath("$.city").value("New York"))
-//            .andExpect(jsonPath("$.telephone").value("1234567890"));
-//    }
+       mockMvc.perform(get("/owners/1")
+               .accept(MediaType.APPLICATION_JSON))
+           .andExpect(status().isOk())
+           .andExpect(jsonPath("$.id").value(1))
+           .andExpect(jsonPath("$.firstName").value("John"))
+           .andExpect(jsonPath("$.lastName").value("Doe"))
+           .andExpect(jsonPath("$.address").value("123 Street"))
+           .andExpect(jsonPath("$.city").value("New York"))
+           .andExpect(jsonPath("$.telephone").value("1234567890"));
+   }
 
-//    @Test
-//    void shouldReturnAllOwners_WhenOwnersExist() throws Exception {
-//        Owner owner1 = new Owner();
-//        owner1.setId(1);
-//        owner1.setFirstName("John");
-//        owner1.setLastName("Doe");
-//        owner1.setAddress("123 Street");
-//        owner1.setCity("New York");
-//        owner1.setTelephone("1234567890");
+   @Test
+   void shouldReturnAllOwners_WhenOwnersExist() throws Exception {
+       Owner owner1 = new Owner();
+       owner1.setId(1);
+       owner1.setFirstName("John");
+       owner1.setLastName("Doe");
+       owner1.setAddress("123 Street");
+       owner1.setCity("New York");
+       owner1.setTelephone("1234567890");
 
-//        Owner owner2 = new Owner();
-//        owner2.setId(2);
-//        owner2.setFirstName("Jane");
-//        owner2.setLastName("Doe");
-//        owner2.setAddress("456 Avenue");
-//        owner2.setCity("Los Angeles");
-//        owner2.setTelephone("0987654321");
+       Owner owner2 = new Owner();
+       owner2.setId(2);
+       owner2.setFirstName("Jane");
+       owner2.setLastName("Doe");
+       owner2.setAddress("456 Avenue");
+       owner2.setCity("Los Angeles");
+       owner2.setTelephone("0987654321");
 
-//        given(ownerRepository.findAll()).willReturn(Arrays.asList(owner1, owner2));
+       given(ownerRepository.findAll()).willReturn(Arrays.asList(owner1, owner2));
 
-//        mockMvc.perform(get("/owners")
-//                .accept(MediaType.APPLICATION_JSON))
-//            .andExpect(status().isOk())
-//            .andExpect(jsonPath("$[0].id").value(1))
-//            .andExpect(jsonPath("$[0].firstName").value("John"))
-//            .andExpect(jsonPath("$[0].lastName").value("Doe"))
-//            .andExpect(jsonPath("$[1].id").value(2))
-//            .andExpect(jsonPath("$[1].firstName").value("Jane"))
-//            .andExpect(jsonPath("$[1].lastName").value("Doe"));
-//    }
+       mockMvc.perform(get("/owners")
+               .accept(MediaType.APPLICATION_JSON))
+           .andExpect(status().isOk())
+           .andExpect(jsonPath("$[0].id").value(1))
+           .andExpect(jsonPath("$[0].firstName").value("John"))
+           .andExpect(jsonPath("$[0].lastName").value("Doe"))
+           .andExpect(jsonPath("$[1].id").value(2))
+           .andExpect(jsonPath("$[1].firstName").value("Jane"))
+           .andExpect(jsonPath("$[1].lastName").value("Doe"));
+   }
 
-//    @Test
-//    void shouldUpdateOwner_WhenOwnerExists() throws Exception {
-//        Owner owner = new Owner();
-//        owner.setId(1);
-//        owner.setFirstName("John");
-//        owner.setLastName("Doe");
-//        owner.setAddress("123 Street");
-//        owner.setCity("New York");
-//        owner.setTelephone("1234567890");
+   @Test
+   void shouldUpdateOwner_WhenOwnerExists() throws Exception {
+       Owner owner = new Owner();
+       owner.setId(1);
+       owner.setFirstName("John");
+       owner.setLastName("Doe");
+       owner.setAddress("123 Street");
+       owner.setCity("New York");
+       owner.setTelephone("1234567890");
 
-//        given(ownerRepository.findById(1)).willReturn(Optional.of(owner));
-//        given(ownerRepository.save(any(Owner.class))).willReturn(owner);
+       given(ownerRepository.findById(1)).willReturn(Optional.of(owner));
+       given(ownerRepository.save(any(Owner.class))).willReturn(owner);
 
-//        mockMvc.perform(put("/owners/1")
-//                .contentType(MediaType.APPLICATION_JSON)
-//                .content("""
-//                {
-//                    "firstName": "John Updated",
-//                    "lastName": "Doe Updated",
-//                    "address": "456 Updated Street",
-//                    "city": "Updated City",
-//                    "telephone": "1112223333"
-//                }
-//                """))
-//            .andExpect(status().isNoContent());
-//    }
+       mockMvc.perform(put("/owners/1")
+               .contentType(MediaType.APPLICATION_JSON)
+               .content("""
+               {
+                   "firstName": "John Updated",
+                   "lastName": "Doe Updated",
+                   "address": "456 Updated Street",
+                   "city": "Updated City",
+                   "telephone": "1112223333"
+               }
+               """))
+           .andExpect(status().isNoContent());
+   }
 
-//     @Test
-//     void shouldReturnNotFound_WhenOwnerDoesNotExist() throws Exception {
-//         given(ownerRepository.findById(999)).willReturn(Optional.empty());
+    @Test
+    void shouldReturnNotFound_WhenOwnerDoesNotExist() throws Exception {
+        given(ownerRepository.findById(999)).willReturn(Optional.empty());
 
-//         mockMvc.perform(get("/owners/999")
-//                 .accept(MediaType.APPLICATION_JSON))
-//             .andExpect(status().isOk());
-//     }
+        mockMvc.perform(get("/owners/999")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk());
+    }
 
-//     @Test
-//     void shouldReturnBadRequest_WhenCreatingOwnerWithInvalidData() throws Exception {
-//         mockMvc.perform(post("/owners")
-//                 .contentType(MediaType.APPLICATION_JSON)
-//                 .content("""
-//             {
-//                 "firstName": "",
-//                 "lastName": "",
-//                 "address": "",
-//                 "city": "",
-//                 "telephone": ""
-//             }
-//             """))
-//             .andExpect(status().isBadRequest());
-//     }
+    @Test
+    void shouldReturnBadRequest_WhenCreatingOwnerWithInvalidData() throws Exception {
+        mockMvc.perform(post("/owners")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+            {
+                "firstName": "",
+                "lastName": "",
+                "address": "",
+                "city": "",
+                "telephone": ""
+            }
+            """))
+            .andExpect(status().isBadRequest());
+    }
 
-//     @Test
-//     void shouldReturnNotFound_WhenUpdatingNonExistentOwner() throws Exception {
-//         given(ownerRepository.findById(999)).willReturn(Optional.empty());
+    @Test
+    void shouldReturnNotFound_WhenUpdatingNonExistentOwner() throws Exception {
+        given(ownerRepository.findById(999)).willReturn(Optional.empty());
 
-//         mockMvc.perform(put("/owners/999")
-//                 .contentType(MediaType.APPLICATION_JSON)
-//                 .content("""
-//             {
-//                 "firstName": "John",
-//                 "lastName": "Doe",
-//                 "address": "123 Street",
-//                 "city": "New York",
-//                 "telephone": "1234567890"
-//             }
-//             """))
-//             .andExpect(status().isNotFound());
-//     }
+        mockMvc.perform(put("/owners/999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+            {
+                "firstName": "John",
+                "lastName": "Doe",
+                "address": "123 Street",
+                "city": "New York",
+                "telephone": "1234567890"
+            }
+            """))
+            .andExpect(status().isNotFound());
+    }
 
-//     @Test
-//     void shouldHandleEmptyOwnerList() throws Exception {
-//         given(ownerRepository.findAll()).willReturn(Arrays.asList());
+    @Test
+    void shouldHandleEmptyOwnerList() throws Exception {
+        given(ownerRepository.findAll()).willReturn(Arrays.asList());
 
-//         mockMvc.perform(get("/owners")
-//                 .accept(MediaType.APPLICATION_JSON))
-//             .andExpect(status().isOk())
-//             .andExpect(jsonPath("$").isEmpty());
-//     }
-
-
-//     @Test
-//     void shouldReturnBadRequest_WhenOwnerIdIsInvalid() throws Exception {
-//         mockMvc.perform(get("/owners/0")
-//                 .accept(MediaType.APPLICATION_JSON))
-//             .andExpect(status().isBadRequest());
-//     }
+        mockMvc.perform(get("/owners")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+    }
 
 
-//     @Test
-//     void shouldMapOwnerRequestToOwnerEntity() {
-//         // Arrange
-//         OwnerRequest request = new OwnerRequest("John", "Doe", "123 Street", "New York", "1234567890");
-//         Owner owner = new Owner();
+    @Test
+    void shouldReturnBadRequest_WhenOwnerIdIsInvalid() throws Exception {
+        mockMvc.perform(get("/owners/0")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest());
+    }
 
-//         // Act
-//         ownerEntityMapper.map(owner, request);
 
-//         assert true;
-//     }
+    @Test
+    void shouldMapOwnerRequestToOwnerEntity() {
+        // Arrange
+        OwnerRequest request = new OwnerRequest("John", "Doe", "123 Street", "New York", "1234567890");
+        Owner owner = new Owner();
+
+        // Act
+        ownerEntityMapper.map(owner, request);
+
+        assert true;
+    }
 
 }
