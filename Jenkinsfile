@@ -58,7 +58,7 @@ pipeline {
                             // Get the previous successful build's commit
                             def previousCommit = ""
                             if (currentBuild.previousSuccessfulBuild) {
-                                previousCommit = sh(script: "git rev-parse HEAD~1", returnStdout: true).trim()
+                                previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT 
                             } else {
                                 echo "No previous successful build found, comparing with previous commit"
                                 previousCommit = sh(script: "git rev-parse HEAD~1", returnStdout: true).trim()
