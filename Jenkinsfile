@@ -138,9 +138,8 @@ pipeline {
                                     }
                                 }
                             } else {
-                                echo "No changes detected or git diff returned empty result"
-                                currentBuild.result = 'ABORTED'
-                                error("No changes detected to build")
+                                echo "No changes detected - skipping build"
+                                env.SKIP_BUILD = "true"
                             }
                         } catch (Exception e) {
                             echo "Error detecting changes: ${e.message}"
@@ -170,7 +169,20 @@ pipeline {
             }
         }
         
+        stage('Skip Build') {
+            when {
+                environment name: 'SKIP_BUILD', value: 'true'
+            }
+            steps {
+                echo 'No changes detected - skipping build and test stages'
+                echo 'Build completed successfully with no changes'
+            }
+        }
+        
         stage('Build') {
+            when {
+                not { environment name: 'SKIP_BUILD', value: 'true' }
+            }
             parallel {
                 stage('Config Server') {
                     when {
@@ -271,6 +283,9 @@ pipeline {
         }
         
         stage('Test') {
+            when {
+                not { environment name: 'SKIP_BUILD', value: 'true' }
+            }
             parallel {
                 stage('Customers Service') { 
                     when { 
