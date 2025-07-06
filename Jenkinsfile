@@ -1,12 +1,8 @@
 pipeline {
     agent any
 
-    
-    options {
-        buildDiscarder(logRotator(
-            numToKeepStr: '10',      // Giữ logs của 10 builds
-            artifactNumToKeepStr: '5' // Chỉ giữ artifacts của 5 builds gần nhất
-        ))
+    environment {
+        MINIMUM_COVERAGE = 70
     }
 
     stages {
@@ -58,50 +54,27 @@ pipeline {
             }
         }
 
-
         stage('Test') {
             steps {
                 script {
                     if (CHANGED_SERVICES_LIST.contains('all')) {
                         echo 'Testing all modules'
                         sh './mvnw clean test'
-                        // Debug: Check target directory contents
-                        sh 'find . -name "surefire-reports" -type d'
-                        sh 'find . -name "jacoco.exec" -type f'
                     } else {
                         def modules = CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service" }.join(',')
                         echo "Testing modules: ${modules}"
                         sh "./mvnw clean test -pl ${modules}"
-                        // Debug: Check target directory contents
-                        sh 'find . -name "surefire-reports" -type d'
-                        sh 'find . -name "jacoco.exec" -type f'
                     }
                 }
             }
             post {
                 always {
                     script {
-                        def testReportPattern = ''
-                        def jacocoPattern = ''
-
-                        if (CHANGED_SERVICES_LIST.contains('all')) {
-                            testReportPattern = '**/surefire-reports/TEST-*.xml'
-                            jacocoPattern = '**/jacoco.exec'
-                        } else {
-                            def patterns = CHANGED_SERVICES_LIST.collect {
-                                "spring-petclinic-${it}-service/target/surefire-reports/TEST-*.xml"
-                            }.join(',')
-                            testReportPattern = patterns
-
-                            def jacocoPatterns = CHANGED_SERVICES_LIST.collect {
-                                "spring-petclinic-${it}-service/target/jacoco.exec"
-                            }.join(',')
-                            jacocoPattern = jacocoPatterns
-                        }
-
-                        echo "Looking for test reports with pattern: ${testReportPattern}"
-                        sh "find . -name 'TEST-*.xml' -type f"
-
+                        // Collect test results
+                        def testReportPattern = CHANGED_SERVICES_LIST.contains('all') ? 
+                            '**/surefire-reports/TEST-*.xml' : 
+                            CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service/target/surefire-reports/TEST-*.xml" }.join(',')
+                        
                         def testFiles = sh(script: "find . -name 'TEST-*.xml' -type f", returnStdout: true).trim()
                         if (testFiles) {
                             echo "Found test reports: ${testFiles}"
@@ -110,35 +83,8 @@ pipeline {
                             echo 'No test reports found, likely no tests were executed.'
                         }
 
-                        echo "Looking for JaCoCo data with pattern: ${jacocoPattern}"
-                        sh "find . -name 'jacoco.exec' -type f"
-
-                        def jacocoFiles = sh(script: "find . -name 'jacoco.exec' -type f", returnStdout: true).trim()
-                        if (jacocoFiles) {
-                            echo "Found JaCoCo files: ${jacocoFiles}"
-                            
-                            // Generate overall JaCoCo report
-                            jacoco(
-                                execPattern: jacocoPattern,
-                                classPattern: CHANGED_SERVICES_LIST.contains('all') ?
-                                    '**/target/classes' :
-                                    CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service/target/classes" }.join(','),
-                                sourcePattern: CHANGED_SERVICES_LIST.contains('all') ?
-                                    '**/src/main/java' :
-                                    CHANGED_SERVICES_LIST.collect { "spring-petclinic-${it}-service/src/main/java" }.join(','),
-                                changeBuildStatus: false,
-                                minimumLineCoverage: '0',
-                                maximumLineCoverage: '100'
-                            )
-                        } else {
-                            echo 'No JaCoCo execution data found, skipping coverage report.'
-                        }
-                    }
-                }
-
-                success {
-                    script {
-                        def failed = []
+                        // Check coverage for each service individually using recordCoverage
+                        def servicesCoverageFailed = []
                         
                         CHANGED_SERVICES_LIST.each { service ->
                             if (service != 'all' && service in ['customers', 'visits', 'vets', 'genai', 'api-gateway', 'discovery', 'config', 'admin']) {
@@ -148,40 +94,64 @@ pipeline {
                                 if (fileExists(jacocoExecFile)) {
                                     echo "Checking coverage for ${service}..."
                                     
-                                    // Generate individual JaCoCo report for this service
-                                    def individualResult = jacoco(
-                                        execPattern: "${servicePath}/target/jacoco.exec",
-                                        classPattern: "${servicePath}/target/classes",
-                                        sourcePattern: "${servicePath}/src/main/java",
-                                        buildOverBuild: false,
-                                        changeBuildStatus: false,
-                                        minimumLineCoverage: '0',
-                                        maximumLineCoverage: '100'
-                                    )
-                                    
-                                    // Get the coverage result from the plugin
-                                    def result = manager.build.getAction(hudson.plugins.jacoco.JacocoBuildAction)
-                                    
-                                    if (result) {
-                                        def lineCoverage = result.lineCoverage?.getPercentageFloat() ?: 0
-                                        echo "Line Coverage for ${service}: ${lineCoverage}%"
+                                    try {
+                                        // Generate JaCoCo XML report for this service
+                                        sh "./mvnw jacoco:report -pl ${servicePath}"
                                         
-                                        if (lineCoverage < 70.0) {
-                                            failed.add("${service} (${lineCoverage}%)")
+                                        // Use recordCoverage with quality gates for individual service
+                                        def coverageResult = recordCoverage(
+                                            tools: [[parser: 'JACOCO', pattern: "${servicePath}/target/site/jacoco/jacoco.xml"]],
+                                            sourceDirectories: [[path: "${servicePath}/src/main/java"]],
+                                            sourceCodeRetention: 'EVERY_BUILD',
+                                            qualityGates: [
+                                                [threshold: env.MINIMUM_COVERAGE.toInteger(), metric: 'LINE', baseline: 'PROJECT', unstable: true]
+                                            ]
+                                        )
+                                        
+                                        echo "Coverage check completed for ${service}"
+                                        
+                                        // Check if this service caused the build to become unstable
+                                        if (currentBuild.result == 'UNSTABLE') {
+                                            servicesCoverageFailed.add(service)
+                                            // Reset build status to continue checking other services
+                                            currentBuild.result = 'SUCCESS'
                                         }
-                                    } else {
-                                        echo "No JaCoCo result found for ${service}, assuming 0%"
-                                        failed.add("${service} (0%)")
+                                        
+                                    } catch (Exception e) {
+                                        echo "Error checking coverage for ${service}: ${e.getMessage()}"
+                                        servicesCoverageFailed.add(service)
                                     }
                                 } else {
-                                    echo "No JaCoCo exec file found for ${service}, assuming 0%"
-                                    failed.add("${service} (0%)")
+                                    echo "No JaCoCo exec file found for ${service}, assuming coverage failure"
+                                    servicesCoverageFailed.add(service)
                                 }
                             }
                         }
-
-                        if (!failed.isEmpty()) {
-                            error "Code coverage below 70% for services: ${failed.join(', ')}"
+                        
+                        // Generate overall coverage report
+                        if (CHANGED_SERVICES_LIST.contains('all')) {
+                            recordCoverage(
+                                tools: [[parser: 'JACOCO']],
+                                sourceDirectories: [[path: 'src/main/java']],
+                                sourceCodeRetention: 'EVERY_BUILD'
+                            )
+                        } else {
+                            def jacocoPatterns = CHANGED_SERVICES_LIST.collect { 
+                                "spring-petclinic-${it}-service/target/site/jacoco/jacoco.xml" 
+                            }.join(',')
+                            
+                            recordCoverage(
+                                tools: [[parser: 'JACOCO', pattern: jacocoPatterns]],
+                                sourceDirectories: CHANGED_SERVICES_LIST.collect { 
+                                    [path: "spring-petclinic-${it}-service/src/main/java"] 
+                                },
+                                sourceCodeRetention: 'EVERY_BUILD'
+                            )
+                        }
+                        
+                        // Fail build if any service has insufficient coverage
+                        if (!servicesCoverageFailed.isEmpty()) {
+                            error "Code coverage below ${env.MINIMUM_COVERAGE}% for services: ${servicesCoverageFailed.join(', ')}"
                         }
                     }
                 }
@@ -202,6 +172,13 @@ pipeline {
                     archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
                 }
             }
+        }
+    }
+    
+    post {
+        always {
+            echo "Pipeline completed with result: ${currentBuild.currentResult}"
+            echo "Completed at: ${new java.text.SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date())}"
         }
     }
 }
