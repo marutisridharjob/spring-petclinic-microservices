@@ -1,0 +1,34 @@
+name: Run Contract Tests
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          pip install pytest requests
+
+      - name: Start Docker services
+        run: |
+          docker compose up -d
+          sleep 20
+
+      - name: Run contract tests
+        run: |
+          pytest tests/contract
+
+      - name: Stop Docker
+        if: always()
+        run: docker compose down
