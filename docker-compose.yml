@@ -1,3 +1,6 @@
+x-variables:
+  GIT_COMMIT_SHA: "local-dev"
+
 services:
   config-server:
     image: springcommunity/spring-petclinic-config-server
@@ -33,6 +36,8 @@ services:
      - 8761:8761
 
   customers-service:
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     image: springcommunity/spring-petclinic-customers-service
     container_name: customers-service
     deploy:
@@ -48,6 +53,8 @@ services:
     - 8081:8081
 
   visits-service:
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     image: springcommunity/spring-petclinic-visits-service
     container_name: visits-service
     deploy:
@@ -63,6 +70,8 @@ services:
      - 8082:8082
 
   vets-service:
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     image: springcommunity/spring-petclinic-vets-service
     container_name: vets-service
     deploy:
@@ -85,6 +94,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - AZURE_OPENAI_KEY=${AZURE_OPENAI_KEY}
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -159,3 +169,4 @@ services:
           memory: 256M
     ports:
     - 9091:9090
+

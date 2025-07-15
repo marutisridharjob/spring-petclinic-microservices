@@ -18,7 +18,7 @@ package org.springframework.samples.petclinic.config;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.config.server.EnableConfigServer;
-
+import org.slf4j.MDC;
 /**
  * @author Maciej Szarlinski
  */
@@ -27,6 +27,13 @@ import org.springframework.cloud.config.server.EnableConfigServer;
 public class ConfigServerApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ConfigServerApplication.class, args);
+        // Inject GIT_COMMIT_SHA env var into logs
+        String commit = System.getenv("GIT_COMMIT_SHA");
+        if (commit == null) {
+            commit = "UNKNOWN";
+        }
+        MDC.put("commit", commit);
+        SpringApplication.run(ConfigServerApplication.class, args);
+
 	}
 }

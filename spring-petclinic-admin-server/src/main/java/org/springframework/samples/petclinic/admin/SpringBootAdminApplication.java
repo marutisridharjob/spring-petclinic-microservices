@@ -19,13 +19,20 @@ import de.codecentric.boot.admin.server.config.EnableAdminServer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
-
+import org.slf4j.MDC;
 @SpringBootApplication
 @EnableAdminServer
 @EnableDiscoveryClient
 public class SpringBootAdminApplication {
     public static void main(String[] args) {
+        // Inject GIT_COMMIT_SHA env var into logs
+        String commit = System.getenv("GIT_COMMIT_SHA");
+        if (commit == null) {
+            commit = "UNKNOWN";
+        }
+        MDC.put("commit", commit);
         SpringApplication.run(SpringBootAdminApplication.class, args);
+
     }
 
 }

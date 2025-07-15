@@ -37,7 +37,7 @@ import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import java.time.Duration;
-
+import org.slf4j.MDC;
 
 /**
  * @author Maciej Szarlinski
@@ -47,7 +47,14 @@ import java.time.Duration;
 public class ApiGatewayApplication {
 
     public static void main(String[] args) {
+        // Inject GIT_COMMIT_SHA env var into logs
+        String commit = System.getenv("GIT_COMMIT_SHA");
+        if (commit == null) {
+            commit = "UNKNOWN";
+        }
+        MDC.put("commit", commit);
         SpringApplication.run(ApiGatewayApplication.class, args);
+
     }
 
     @Bean

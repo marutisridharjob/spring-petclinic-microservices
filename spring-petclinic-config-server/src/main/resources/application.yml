@@ -10,3 +10,6 @@ spring:
         native:
           searchLocations: file:///${GIT_REPO}
 
+logging:
+  pattern:
+    level: "%5p [commit:%X{commit}]"

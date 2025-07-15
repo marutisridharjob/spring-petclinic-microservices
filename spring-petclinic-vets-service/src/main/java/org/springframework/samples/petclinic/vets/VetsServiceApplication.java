@@ -20,6 +20,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.samples.petclinic.vets.system.VetsProperties;
+import org.slf4j.MDC;
 
 /**
  * @author Maciej Szarlinski
@@ -30,6 +31,13 @@ import org.springframework.samples.petclinic.vets.system.VetsProperties;
 public class VetsServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(VetsServiceApplication.class, args);
+        // Inject GIT_COMMIT_SHA env var into logs
+        String commit = System.getenv("GIT_COMMIT_SHA");
+        if (commit == null) {
+            commit = "UNKNOWN";
+        }
+        MDC.put("commit", commit);
+        SpringApplication.run(VetsServiceApplication.class, args);
+
 	}
 }

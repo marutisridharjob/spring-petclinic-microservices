@@ -18,7 +18,7 @@ package org.springframework.samples.petclinic.discovery;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.netflix.eureka.server.EnableEurekaServer;
-
+import org.slf4j.MDC;
 /**
  * @author Maciej Szarlinski
  */
@@ -27,6 +27,13 @@ import org.springframework.cloud.netflix.eureka.server.EnableEurekaServer;
 public class DiscoveryServerApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(DiscoveryServerApplication.class, args);
+        // Inject GIT_COMMIT_SHA env var into logs
+        String commit = System.getenv("GIT_COMMIT_SHA");
+        if (commit == null) {
+            commit = "UNKNOWN";
+        }
+        MDC.put("commit", commit);
+        SpringApplication.run(DiscoveryServerApplication.class, args);
+
 	}
 }
