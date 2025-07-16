@@ -5,6 +5,8 @@ services:
   config-server:
     image: springcommunity/spring-petclinic-config-server
     container_name: config-server
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -17,9 +19,12 @@ services:
     ports:
      - 8888:8888
 
+
   discovery-server:
     image: springcommunity/spring-petclinic-discovery-server
     container_name: discovery-server
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -111,6 +116,8 @@ services:
   api-gateway:
     image: springcommunity/spring-petclinic-api-gateway
     container_name: api-gateway
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -126,6 +133,8 @@ services:
   tracing-server:
     image: openzipkin/zipkin
     container_name: tracing-server
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -136,6 +145,8 @@ services:
   admin-server:
     image: springcommunity/spring-petclinic-admin-server
     container_name: admin-server
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -153,6 +164,8 @@ services:
   grafana-server:
     build: ./docker/grafana
     container_name: grafana-server
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
@@ -163,6 +176,8 @@ services:
   prometheus-server:
     build: ./docker/prometheus
     container_name: prometheus-server
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
     deploy:
       resources:
         limits:
