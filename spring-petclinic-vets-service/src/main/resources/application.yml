@@ -17,4 +17,4 @@ spring:
 
 logging:
   pattern:
-    level: "%5p [commit:%X{commit}]"
+    level: "%d{yyyy-MM-dd HH:mm:ss} %-5level [commit:%X{commit}] %logger{36} - %msg%n"
