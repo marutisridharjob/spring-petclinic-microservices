@@ -22,3 +22,5 @@ spring:
 logging:
   pattern:
     level: "%5p [commit:%X{commit}]"
+environment:
+  - GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
