@@ -1,3 +1,6 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: api-gateway
@@ -41,6 +44,14 @@ spring:
           filters:
             - StripPrefix=2
             - CircuitBreaker=name=genaiCircuitBreaker,fallbackUri=/fallback
+      discovery:
+        locator:
+          enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
 
 ---
 spring:

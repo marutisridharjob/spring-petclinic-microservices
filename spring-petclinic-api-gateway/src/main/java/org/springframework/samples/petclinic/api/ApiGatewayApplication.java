@@ -26,6 +26,7 @@ import org.springframework.cloud.client.circuitbreaker.Customizer;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -44,6 +45,7 @@ import java.time.Duration;
  */
 @EnableDiscoveryClient
 @SpringBootApplication
+@ComponentScan(basePackages = "org.springframework.samples.petclinic.api")
 public class ApiGatewayApplication {
 
     public static void main(String[] args) {

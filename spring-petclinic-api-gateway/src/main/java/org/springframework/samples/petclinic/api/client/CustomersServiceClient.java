@@ -13,45 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springframework.samples.petclinic.api.application;
+package org.springframework.samples.petclinic.api.client;
 
-import org.springframework.samples.petclinic.api.dto.Visits;
+import org.springframework.samples.petclinic.api.dto.OwnerDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
-import java.util.List;
-
-import static java.util.stream.Collectors.joining;
 
 /**
  * @author Maciej Szarlinski
  */
 @Component
-public class VisitsServiceClient {
-
-    // Could be changed for testing purpose
-    private String hostname = "http://visits-service/";
+public class CustomersServiceClient {
 
     private final WebClient.Builder webClientBuilder;
 
-    public VisitsServiceClient(WebClient.Builder webClientBuilder) {
+    public CustomersServiceClient(WebClient.Builder webClientBuilder) {
         this.webClientBuilder = webClientBuilder;
     }
 
-    public Mono<Visits> getVisitsForPets(final List<Integer> petIds) {
-        return webClientBuilder.build()
-            .get()
-            .uri(hostname + "pets/visits?petId={petId}", joinIds(petIds))
+    public Mono<OwnerDetails> getOwner(final int ownerId) {
+        return webClientBuilder.build().get()
+            .uri("http://customers-service/owners/{ownerId}", ownerId)
             .retrieve()
-            .bodyToMono(Visits.class);
-    }
-
-    private String joinIds(List<Integer> petIds) {
-        return petIds.stream().map(Object::toString).collect(joining(","));
-    }
-
-    void setHostname(String hostname) {
-        this.hostname = hostname;
+            .bodyToMono(OwnerDetails.class);
     }
 }

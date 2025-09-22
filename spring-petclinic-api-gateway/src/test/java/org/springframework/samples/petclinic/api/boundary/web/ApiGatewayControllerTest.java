@@ -10,7 +10,10 @@ import org.springframework.cloud.circuitbreaker.resilience4j.ReactiveResilience4
 import org.springframework.context.annotation.Import;
 import org.springframework.samples.petclinic.api.application.CustomersServiceClient;
 import org.springframework.samples.petclinic.api.application.VisitsServiceClient;
-import org.springframework.samples.petclinic.api.dto.*;
+import org.springframework.samples.petclinic.api.dto.OwnerDetails;
+import org.springframework.samples.petclinic.api.dto.PetDetails;
+import org.springframework.samples.petclinic.api.dto.VisitDetails;
+import org.springframework.samples.petclinic.api.dto.Visits;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;

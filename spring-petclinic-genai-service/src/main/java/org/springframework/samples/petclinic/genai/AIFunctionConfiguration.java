@@ -1,8 +1,8 @@
 package org.springframework.samples.petclinic.genai;
 
-import java.util.List;
-import java.util.function.Function;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -13,10 +13,8 @@ import org.springframework.samples.petclinic.genai.dto.PetDetails;
 import org.springframework.samples.petclinic.genai.dto.PetRequest;
 import org.springframework.samples.petclinic.genai.dto.Vet;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
+import java.util.List;
+import java.util.function.Function;
 
 /**
  * This class defines the @Bean functions that the LLM provider will invoke when it
